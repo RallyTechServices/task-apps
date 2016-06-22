@@ -438,28 +438,50 @@ Ext.define("manager-task-report", {
             {
                 xtype: 'treecolumn',
                 text: 'Owner',
+                menuDisabled: true,
                 dataIndex: 'Owner',
                 flex: 1
             },{
                 text:'Defined',
+                menuDisabled: true,
                 dataIndex:'numDefined'
             },{
                 text:'In Progress',
+                menuDisabled: true,
                 dataIndex:'numInProgress'
             },{
                 text:'Completed',
+                menuDisabled: true,
                 dataIndex:'numCompleted'
             },{
                 text: 'Total ToDo',
+                menuDisabled: true,
                 dataIndex: 'ToDo'
             },{
                 text: '%Complete (Count)',
                 dataIndex: 'pctCompleteCount',
-                renderer: this.percentRenderer
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteCount',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
             },{
                 text: '%Complete (Effort)',
                 dataIndex: 'pctCompleteEffort',
-                renderer: this.percentRenderer
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteEffort',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
+
             }
         ];
         return columns;

@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jun 22 2016 17:15:18 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jun 22 2016 17:24:37 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jun 22 2016 17:15:18 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Jun 22 2016 17:24:37 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 26532749915;
+        var CHECKSUM = 27820895562;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1083,28 +1083,50 @@ Ext.define("manager-task-report", {
             {
                 xtype: 'treecolumn',
                 text: 'Owner',
+                menuDisabled: true,
                 dataIndex: 'Owner',
                 flex: 1
             },{
                 text:'Defined',
+                menuDisabled: true,
                 dataIndex:'numDefined'
             },{
                 text:'In Progress',
+                menuDisabled: true,
                 dataIndex:'numInProgress'
             },{
                 text:'Completed',
+                menuDisabled: true,
                 dataIndex:'numCompleted'
             },{
                 text: 'Total ToDo',
+                menuDisabled: true,
                 dataIndex: 'ToDo'
             },{
                 text: '%Complete (Count)',
                 dataIndex: 'pctCompleteCount',
-                renderer: this.percentRenderer
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteCount',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
             },{
                 text: '%Complete (Effort)',
                 dataIndex: 'pctCompleteEffort',
-                renderer: this.percentRenderer
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteEffort',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
+
             }
         ];
         return columns;
