@@ -6,11 +6,13 @@ Ext.define("manager-task-report", {
 
     config: {
         defaultSettings: {
-            employeeIDField: 'c_EmployeeID',
-            managerEmployeeIDField: 'c_ManagerID',
+            employeeIDField: 'c_EmployeeId',
+            managerEmployeeIDField: 'c_ManagerEmployeeId',
             costCenterField: 'CostCenter',
             costCenter: null,
-            isManagerField: 'c_IsManager'
+            isManagerField: 'c_IsManager',
+            showHistoricalData: true,
+            daysBack: 7
         }
     },
 
@@ -25,6 +27,7 @@ Ext.define("manager-task-report", {
     },
                         
     launch: function() {
+        this.logger.log('launch')
         this.userManagerStore = Ext.create('CArABU.technicalservices.UserManagerStore',{
             employeeIDField: this.getEmployeeIDField(),
             managerEmployeeIDField: this.getManagerEmployeeIDField(),
@@ -37,12 +40,19 @@ Ext.define("manager-task-report", {
         this.userManagerStore.on('configurationerror', this._showConfigurationError, this);
     },
     _showConfigurationError: function(msg){
-        this.removeAll();
-        this.add({
+        this.down('#display_box').removeAll();
+        this.down('#display_box').add({
             xtype: 'container',
             html: msg,
             cls: "configuration-error"
         });
+    },
+    showHistoricalData: function(){
+        return this.getSetting('showHistoricalData') === "true" || this.getSetting('showHistoricalData') === true;
+    },
+    getHistoricalDate: function(){
+        var daysBack = this.getSetting('daysBack') || 7;
+        return Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',daysBack));
     },
     getIsManagerField: function(){
         return this.getSetting('isManagerField');
@@ -60,7 +70,7 @@ Ext.define("manager-task-report", {
         return this.getSetting('costCenter');
     },
     getTaskFetchList: function(){
-        return ['FormattedID','Name','ToDo','Estimate','State','Owner','Milestones',this.getEmployeeIDField(),this.getManagerEmployeeIDField()];
+        return ['ObjectID','FormattedID','Name','ToDo','Estimate','State','Owner','Milestones',this.getEmployeeIDField(),this.getManagerEmployeeIDField()];
     },
     _getAllManagerFilters: function(){
         return [{
@@ -72,23 +82,24 @@ Ext.define("manager-task-report", {
             value: 'Y'
         }];
     },
-    _getDirectReportFilters: function(managerID){
-        this.logger.log('_getDirectReportFilters', managerID);
-        return [{
-            property: this.getManagerEmployeeIDField(),
-            value: managerID
-        }];
-    },
     _getUserFetch: function(){
-        return ['UserName','Email','First Name','Last Name','DisplayName'].concat([this.getEmployeeIDField(), this.getManagerEmployeeIDField(), this.getIsManagerField()]);
+        return ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.getEmployeeIDField(), this.getManagerEmployeeIDField(), this.getIsManagerField()]);
     },
     _updateManagers: function(store, records, success){
         this.logger.log('_updateManagers', store, records);
+        this.managerRecords = null;
         if (success){
-            this.userManagerStore._addManagerRecords(records);
+            this.managerRecords = records;
         } else {
             Rally.ui.notify.Notifier.showError({message: 'Error loading managers.'});
         }
+    },
+    _addIterationFilter: function(){
+        this.down('#manager_box').add({
+            xtype: 'rallyiterationcombobox',
+            fieldLabel: 'Iteration',
+            labelAlign: 'right'
+        });
     },
     _addManagerFilters: function(){
         var employeeIDField = this.getEmployeeIDField();
@@ -100,34 +111,76 @@ Ext.define("manager-task-report", {
             allowNoEntry: true,
             value: null,
             width: 300,
+            remoteFilter: false,
             storeConfig: {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),
                 limit: 'Infinity',
+                autoLoad: true,
                 listeners: {
                     scope: this,
-                    load: this._updateManagers
+                    load: this._updateManagers,
+                    single: true
                 }
             },
             valueField: employeeIDField,
-            displayField: "DisplayName",
-            listeners: {
-                scope: this,
-                select: this._fetchTasks
-            }
+            displayField: "DisplayName"
+
         });
     },
-
     _initializeApp: function(){
         this.logger.log('_initializeApp');
+        this.down('#display_box').removeAll();
+        this.down('#detail_box').removeAll();
+        this.down('#manager_box').removeAll();
 
+
+        this._addIterationFilter();
         this._addManagerFilters();
+
+        var btn = this.down('#manager_box').add({
+            xtype: 'rallybutton',
+            text: 'Update'
+        });
+        btn.on('click', this._fetchTasks, this);
+
     },
-    _fetchTasks: function(cb){
-        this.logger.log('_fetchTasks', cb.getValue());
-        this.selectedManagerId = cb.getValue();
+    getSelectedManagerId: function(){
+        return this.down('rallyusercombobox') && this.down('rallyusercombobox').getValue() || null;
+    },
+    getSelectedIterationFilter: function(){
+        var iterationRecord = this.down('rallyiterationcombobox') && this.down('rallyiterationcombobox').getRecord();
+        if (iterationRecord){
+            return Rally.data.wsapi.Filter.and([{
+                property: 'WorkProduct.Iteration.Name',
+                value: iterationRecord.get('Name')
+            },{
+                property: 'WorkProduct.Iteration.StartDate',
+                value: iterationRecord.get('StartDate')
+            },{
+                property: 'WorkProduct.Iteration.EndDate',
+                value: iterationRecord.get('EndDate')
+            }]);
+        }
+        return null;
+    },
+    getManagerRecords: function(){
+        this.logger.log('thi',this.down('rallyusercombobox').getStore().getRange());
+       return this.managerRecords;
+    },
+    _fetchTasks: function(){
+        var managerId = this.getSelectedManagerId();
+        this.logger.log('_fetchTasks', this.getSelectedManagerId());
+
+        if (!managerId){
+            Rally.ui.notify.Notifier.showWarning({message: "Please select a manager."});
+            return;
+        }
+
+        this.userTree = this.userManagerStore.buildManagerTree(managerId, this.getManagerRecords());
+
         //First we need to get all the possible managers
-        var managerIds = this.userManagerStore.getReportingManagerIds(cb.getValue()),
+        var managerIds = this.userTree.getAllChildrenEmployeeIds(managerId),
             managerIDField = this.getManagerEmployeeIDField(),
             filters = _.map(managerIds, function(id){
                 return {
@@ -137,6 +190,12 @@ Ext.define("manager-task-report", {
             });
 
         filters = Rally.data.wsapi.Filter.or(filters);
+        var iterationFilter = this.getSelectedIterationFilter();
+        if (iterationFilter){
+            this.logger.log('iterationFilter', iterationFilter.toString());
+            filters = filters.and(iterationFilter);
+
+        }
         this.logger.log('_fetchTasks filters',filters.toString());
 
         Ext.create('Rally.data.wsapi.Store',{
@@ -154,38 +213,75 @@ Ext.define("manager-task-report", {
     _createSummaryGrid: function(records, operation){
         this.logger.log('_createSummaryGrid', records, operation);
 
-        this.down('summary-grid') && this.down('summary-grid').destroy();
+        this.down('#summary-grid') && this.down('#summary-grid').destroy();
 
         if (!operation.wasSuccessful()){
             Rally.ui.notify.Notifier.showError({ message: "Error fetching Tasks:  " + operation.error.errors.join(',') });
             return;
         }
 
-        var summaryStore = this._buildSummaryStore(records);
-        this.logger.log('_createSummaryGrid', summaryStore);
-        this.down('#display_box').add({
-            xtype: 'treepanel',
-            itemId: 'summary-grid',
-            cls: 'rally-grid',
-            padding: 25,
-            selModel: Ext.create("Ext.selection.RowModel",{
-                listeners: {
-                    select: this._showDetails,
-                    scope: this
-                }
-            }),
-            store: summaryStore,
-            rootVisible: false,
-             columns: this._getSummaryStoreColumnCfgs()
-        });
+        this._fetchHistoricalSummaryTasks(records).then({
+            success: function(snapshots){
+                var summaryStore = this._buildSummaryStore(records, snapshots);
+                this.logger.log('_createSummaryGrid', summaryStore);
+                this.down('#display_box').add({
+                    xtype: 'treepanel',
+                    itemId: 'summary-grid',
+                    cls: 'rally-grid',
+                    padding: 25,
+                    selModel: Ext.create("Ext.selection.RowModel",{
+                        listeners: {
+                            select: this._showDetails,
+                            scope: this
+                        }
+                    }),
+                    store: summaryStore,
+                    rootVisible: false,
+                    columns: this._getSummaryStoreColumnCfgs()
+                });
 
+
+            },
+            scope: this
+        });
+    },
+    _fetchHistoricalSummaryTasks: function(currentTaskRecords){
+        var deferred = Ext.create('Deft.Deferred');
+
+        if (!this.showHistoricalData()){
+            deferred.resolve([]);
+        }
+
+        var tasks = Ext.Array.map(currentTaskRecords, function(r){
+            return r.get('ObjectID');
+        });
+        this.logger.log('_fetchHistoricalSummaryTasks users', tasks);
+
+        Ext.create('Rally.data.lookback.SnapshotStore',{
+            fetch: ['ObjectID','_ItemHierarchy','ToDo','Estimate','State','Owner'],
+            find: {
+                ObjectID: {$in: tasks},
+                __At: this.getHistoricalDate()
+            },
+            limit: 'Infinity'
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    Rally.ui.notify.Notifier.showError({ message: "Error loading historical task summary data:  " + operation.error.errors.join(',') });
+                    deferred.resolve([]);
+                }
+            }
+        });
+        return deferred;
     },
     _showDetails: function(store, record, index){
         this.logger.log('_rowSelected',record, index);
 
         this.down('#detail_box').removeAll();
 
-        var defaultShowGrid = true;
+        var defaultShowGrid = this.showGridState || true;
 
         this.down('#detail_box').add({
             xtype: 'container',
@@ -238,7 +334,8 @@ Ext.define("manager-task-report", {
         if ((btn.iconCls === 'icon-graph' && state === true) || (btn.iconCls === 'icon-grid' && state===false)){
             showGrid = false;
         }
-        this.logger.log('_toggleDetail', btn.iconCls, state, showGrid);
+        this.showGridState = showGrid;
+        this.logger.log('_toggleDetail', btn.iconCls, state, showGrid, record);
 
         if (state){
             btn.removeCls('secondary');
@@ -251,15 +348,23 @@ Ext.define("manager-task-report", {
 
         this.down('rallygridboard')  && this.down('rallygridboard').destroy();
         this.down('rallychart') && this.down('rallychart').destroy();
+
+        //var empId = record.get('empId'),
+        //    user = this.userTree.getUserItem(empId);
+
         if (showGrid){
-            this._addDetailGrid(record.get('tasks'));
+            this._addDetailGrid(record);
         } else {
-            this._addDetailChart(record.get('tasks'));
+            this._addDetailChart(record);
         }
 
     },
-    _addDetailChart: function(tasks){
-        var objectIDFilters = _.map(tasks, function(t){ return t.get('ObjectID'); });
+    _addDetailChart: function(user){
+        var objectIDFilters = user.get('taskIds') || [];
+
+        if (objectIDFilters.length ===0){
+            objectIDFilters.push(0);
+        }
 
         this.down('#detail_box').add({
             xtype: 'rallychart',
@@ -326,91 +431,103 @@ Ext.define("manager-task-report", {
         });
 
     },
-    _addDetailGrid: function(tasks){
+    _addDetailGrid: function(user){
+        var tasks = user.get('taskIds') || [];
 
+        if (tasks.length === 0){
+            tasks[0] = 0;
+        }
+        this.logger.log('_addDetailGrid', user);
         var filters = _.map(tasks, function(t){ return {
             property: 'ObjectID',
-            value: t.get('ObjectID')
+            value: t
             }
         });
         filters = Rally.data.wsapi.Filter.or(filters);
-        this.logger.log('filters', filters.toString());
+        this.logger.log('_addDetailGrid filters', filters.toString());
 
-        Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
-            models: ['task'],
-            autoLoad: false,
-            enableHierarchy: true,
-            filters: filters
-        }).then({
-            success: function(store) {
-               this.down('#detail_box').add({
-                        xtype: 'rallygridboard',
-                        context: this.getContext(),
-                        modelNames: ['task'],
-                        stateful: false,
-                        stateId: "grid-2",
-                        itemId: 'detail-grid',
-                        toggleState: 'grid',
-                        plugins: [{
-                            ptype: 'rallygridboardfieldpicker',
-                            headerPosition: 'left',
+                Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
+                    models: ['task'],
+                    autoLoad: false,
+                    enableHierarchy: true,
+                    filters: filters
+                }).then({
+                    success: function(store) {
+                        this.down('#detail_box').add({
+                            xtype: 'rallygridboard',
+                            context: this.getContext(),
                             modelNames: ['task'],
-                            stateful: true,
-                            stateId: this.getContext().getScopedStateId('detail-columns-2')
-                        },{
-                            ptype: 'rallygridboardinlinefiltercontrol',
-                            inlineFilterButtonConfig: {
+                            stateful: false,
+                            stateId: "grid-2",
+                            itemId: 'detail-grid',
+                            toggleState: 'grid',
+                            plugins: [{
+                                ptype: 'rallygridboardfieldpicker',
+                                headerPosition: 'left',
+                                modelNames: ['extendedTask'],
                                 stateful: true,
-                                stateId: this.getContext().getScopedStateId('detail-filters'),
-                                modelNames: ['task'],
-                                inlineFilterPanelConfig: {
-                                    quickFilterPanelConfig: {
-                                        defaultFields: [
-                                            'ArtifactSearch',
-                                            'Owner',
-                                            'State'
-                                        ]
+                                stateId: this.getContext().getScopedStateId('detail-columns-2')
+                            },{
+                                ptype: 'rallygridboardinlinefiltercontrol',
+                                inlineFilterButtonConfig: {
+                                    stateful: true,
+                                    stateId: this.getContext().getScopedStateId('detail-filters'),
+                                    modelNames: ['task'],
+                                    inlineFilterPanelConfig: {
+                                        quickFilterPanelConfig: {
+                                            defaultFields: [
+                                                'ArtifactSearch',
+                                                'Owner',
+                                                'State'
+                                            ]
+                                        }
                                     }
                                 }
-                            }
-                        },{
-                            ptype: 'rallygridboardactionsmenu',
-                            menuItems: [
-                                {
-                                    text: 'Export...',
-                                    handler: function() {
-                                        window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
-                                            this.down('rallygridboard').getGridOrBoard());
-                                    },
-                                    scope: this
+                            },{
+                                ptype: 'rallygridboardactionsmenu',
+                                menuItems: [
+                                    {
+                                        text: 'Export...',
+                                        handler: function() {
+                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                                                this.down('rallygridboard').getGridOrBoard());
+                                        },
+                                        scope: this
+                                    }
+                                ],
+                                buttonConfig: {
+                                    iconCls: 'icon-export'
                                 }
-                            ],
-                            buttonConfig: {
-                                iconCls: 'icon-export'
-                            }
-                        }],
-                        cardBoardConfig: {
-                            attribute: 'State'
-                        },
-                        gridConfig: {
-                            store: store,
-                            storeConfig: {
-                                filters: filters
+                            }],
+                            cardBoardConfig: {
+                                attribute: 'State'
                             },
-                            rankColumnDataIndex: 'TaskIndex',
-                            columnCfgs: [
-                                'FormattedID',
-                                'Name',
-                                'State',
-                                'Owner',
-                                'ToDo'
-                            ]
-                        },
-                        height: 400
+                            gridConfig: {
+                                store: store,
+                                storeConfig: {
+                                    filters: filters,
+                                    load: function(store, records, success){
+                                        console.log('load', records)
+                                    }
+                                },
+                                rankColumnDataIndex: 'TaskIndex',
+                                columnCfgs: [
+                                    'FormattedID',
+                                    'Name',
+                                    'State',
+                                    'Owner',
+                                    'ToDo'
+                                ]
+                            },
+                            height: 400
+                        });
+                    },
+                    scope: this
                 });
-            },
-            scope: this
-        });
+
+
+
+
     },
     _getDetailColumnCfgs: function(){
         return [{
@@ -439,7 +556,7 @@ Ext.define("manager-task-report", {
                 xtype: 'treecolumn',
                 text: 'Owner',
                 menuDisabled: true,
-                dataIndex: 'Owner',
+                dataIndex: 'displayName',
                 flex: 1
             },{
                 text:'Defined',
@@ -484,6 +601,17 @@ Ext.define("manager-task-report", {
 
             }
         ];
+
+        if (this.showHistoricalData()){
+            columns.push({
+                text: 'Delta ToDo',
+                dataIndex: 'deltaToDo',
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return value;
+                }
+            });
+        }
         return columns;
     },
     percentRenderer: function(val){
@@ -492,14 +620,14 @@ Ext.define("manager-task-report", {
         }
         return "";
     },
-    _buildSummaryStore: function(records){
-
-        this.logger.log('_buildSummaryStore', root);
+    _buildSummaryStore: function(records, snapshots){
 
         //now we need to ask the task records to the store
-        this.userManagerStore.addTasks(records);
-        var root = this.userManagerStore.getUserObj(this.selectedManagerId);
+        this.userTree.processTasks(records,snapshots, this.getSelectedManagerId());
 
+        var root = this.userTree.getUserItem(this.getSelectedManagerId());
+
+        this.logger.log('_buildSummaryStore', root);
 
         return Ext.create('Ext.data.TreeStore', {
             root: { children: root.children,
@@ -507,85 +635,9 @@ Ext.define("manager-task-report", {
             },
             model: CArABU.technicalservices.UserSummaryTaskModel
         });
-
-
-
-        //Ext.Array.each(records, function(r){
-        //    var empID = r.get('Owner') && r.get('Owner')[employeeIDField];
-        //    if (!tasksByEmp[empID]){
-        //        tasksByEmp[empID] = [];
-        //    }
-        //    tasksByEmp[empID].push(r);
-        //});
-        //
-        //var data = [];
-        //Ext.Object.each(tasksByEmp, function(empID, tasks){
-        //    var m = Ext.create("CArABU.technicalservices.UserSummaryTaskModel");
-        //    m.addTasks(tasks);
-        //    data.push(m);
-        //});
-        //
-        //return Ext.create('Rally.data.custom.Store',{
-        //    data: data,
-        //    pageSize: data.length
-        //});
     },
-    _buildGrid: function(store){
-        var context = this.getContext();
-        var modelNames = ['task'];
-        store.load();
-        this.add({
-            xtype: 'managertaskboard',
-            context: context,
-            modelNames: modelNames,
-            toggleState: 'grid',
-            stateful: false,
-          //stateId: context.getScopedStateId('fred'),
-            plugins: [
-                //{
-                //    ptype: 'rallygridboardinlinefiltercontrol',
-                //    inlineFilterButtonConfig: {
-                //        stateful: true,
-                //        stateId: context.getScopedStateId('task-filters-2'),
-                //        modelNames: modelNames,
-                //        inlineFilterPanelConfig: {
-                //            quickFilterPanelConfig: {
-                //                defaultFields: [
-                //                    'ArtifactSearch',
-                //                    'Owner'
-                //                ]
-                //            }
-                //        }
-                //    }
-                //},
-                {
-                    ptype: 'rallygridboardfieldpicker',
-                    headerPosition: 'left',
-                    modelNames: modelNames,
-                    stateful: true,
-                    stateId: context.getScopedStateId('columns-6')
-                }
-            ],
-            gridConfig: {
-                store: store,
-                storeConfig: {
-                    useCompositeArtifacts: false,
-                    sorters: [{
-                        property: 'TaskIndex',
-                        direction: "ASC"
-                    }],
-                   // rankColumnDataIndex: 'TaskIndex'
-                },
-                enableRanking: false,
-                rankColumnDataIndex: 'TaskIndex',
-                enableInlineAdd: false,
-                columnCfgs: [
-                    'Name',
-                    'State'
-                ]
-            },
-            height: this.getHeight()
-        });
+    getSettingsFields: function(){
+        return CArABU.technicalservices.ManagerTaskReport.Settings.getFields();
     },
     getOptions: function() {
         return [
