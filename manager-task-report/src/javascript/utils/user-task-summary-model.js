@@ -145,7 +145,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
         var user = this.getUserItem(empId),
             ids = [empId],
             children = user.getChildren();
-        console.log('--ids', ids, user);
+
         Ext.Array.each(children, function(c){
             ids = ids.concat(this.getAllChildrenEmployeeIds(c.employeeId, true));
         }, this);
@@ -157,7 +157,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 this.userTree = {};
             }
             employeeId = employeeId.toString();
-            console.log('getUserItem', employeeId,this.userTree[employeeId] );
+            console.log('getUserItem', employeeId,this.userTree[employeeId] && this.userTree[employeeId].displayName, this.userTree[employeeId] && this.userTree[employeeId].getChildren().length );
             if (!this.userTree[employeeId]){
                 this.userTree[employeeId] = Ext.create('CArABU.technicalservices.UserTreeItem',{
                     employeeId: employeeId
@@ -170,7 +170,8 @@ Ext.define('CArABU.technicalservices.UserTree',{
         var employeeIdField = this.employeeIDField,
             managerIDField = this.managerIDField,
             tasksByEmpId = {};
-        this.logger.log('processTasks', this.userTree);
+        this.logger.log('processTasks', this.userTree, this.getUserItem("316380").getChildren().length);
+
         Ext.Array.each(records, function(r){
             var empId = r.get('Owner') && r.get('Owner')[employeeIdField];
             if (empId){
@@ -198,6 +199,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 }
             }
         }, this);
+        this.logger.log('processTasks after',this.userTree, this.getUserItem("316380").getChildren().length);
 
         var snapsByOwner = {},
             userOids = [];
@@ -225,9 +227,10 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 userObject.addTasks(snaps, true);
             }
         });
+        this.logger.log('processTasks after 2',this.userTree, this.getUserItem("316380").getChildren().length);
         this.getUserItem(managerId).doCalculations();
         this.getUserItem(managerId).doHistoricalCalculations();
-
+        this.logger.log('processTasks after 3',this.userTree, this.getUserItem("316380").getChildren().length);
         this.logger.log('processTasks manager', this.getUserItem(managerId));
     }
 });
@@ -259,5 +262,7 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
         name: 'deltaToDo'
     },{
         name: 'taskIds'
+    },{
+        name: 'children'
     }]
 });

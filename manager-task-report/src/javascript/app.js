@@ -169,11 +169,14 @@ Ext.define("manager-task-report", {
         return null;
     },
     getManagerRecords: function(){
-        this.logger.log('thi',this.down('rallyusercombobox').getStore().getRange());
        return this.managerRecords;
     },
     _getWsapiTaskFilters: function(empId, includeEmployeeTasks){
-        var managerIds = this.userTree.getAllChildrenEmployeeIds(empId,includeEmployeeTasks),
+        if (!this.managerTree){
+            this.managerTree = this.userManagerStore.buildManagerTree(null,this.getManagerRecords());
+        }
+
+        var managerIds = this.managerTree.getAllChildrenEmployeeIds(empId),
             managerIDField = this.getManagerEmployeeIDField(),
             filters = _.map(managerIds, function(id){
                 return {
@@ -209,27 +212,10 @@ Ext.define("manager-task-report", {
             Rally.ui.notify.Notifier.showWarning({message: "Please select a manager."});
             return;
         }
+        this.setLoading("Loading tasks...");
 
         this.userTree = this.userManagerStore.buildManagerTree(managerId, this.getManagerRecords());
         var filters = this._getWsapiTaskFilters(managerId, false);
-        ////First we need to get all the possible managers
-        //var managerIds = this.userTree.getAllChildrenEmployeeIds(managerId),
-        //    managerIDField = this.getManagerEmployeeIDField(),
-        //    filters = _.map(managerIds, function(id){
-        //        return {
-        //            property: 'Owner.' + managerIDField,
-        //            value: id
-        //        };
-        //    });
-        //
-        //filters = Rally.data.wsapi.Filter.or(filters);
-        //var iterationFilter = this.getSelectedIterationFilter();
-        //if (iterationFilter){
-        //    this.logger.log('iterationFilter', iterationFilter.toString());
-        //    filters = filters.and(iterationFilter);
-        //
-        //}
-
 
         Ext.create('Rally.data.wsapi.Store',{
             model: 'Task',
@@ -251,12 +237,18 @@ Ext.define("manager-task-report", {
 
         if (!operation.wasSuccessful()){
             Rally.ui.notify.Notifier.showError({ message: "Error fetching Tasks:  " + operation.error.errors.join(',') });
+            this.setLoading(false);
             return;
         }
 
         this._fetchHistoricalSummaryTasks(records).then({
             success: function(snapshots){
+                this.setLoading(false);
+                var userItem = this.userTree.getUserItem("320785");
+                this.logger.log('userItem 1', userItem.getChildren().length, userItem.kids && userItem.kids.length);
+
                 var summaryStore = this._buildSummaryStore(records, snapshots);
+
                 this.logger.log('_createSummaryGrid', summaryStore);
                 this.down('#display_box').add({
                     xtype: 'treepanel',
@@ -273,8 +265,6 @@ Ext.define("manager-task-report", {
                     rootVisible: false,
                     columns: this._getSummaryStoreColumnCfgs()
                 });
-
-
             },
             scope: this
         });
@@ -333,6 +323,7 @@ Ext.define("manager-task-report", {
         return deferred;
     },
     _showDetails: function(store, record, index){
+
         this.logger.log('_rowSelected',record, index);
 
         this.down('#detail_box').removeAll();
@@ -385,7 +376,6 @@ Ext.define("manager-task-report", {
 
     },
     _toggleDetail: function(btn, state, record){
-
         var showGrid = true;
         if ((btn.iconCls === 'icon-graph' && state === true) || (btn.iconCls === 'icon-grid' && state===false)){
             showGrid = false;
@@ -401,12 +391,8 @@ Ext.define("manager-task-report", {
             btn.addCls('secondary');
         }
 
-
         this.down('rallygridboard')  && this.down('rallygridboard').destroy();
         this.down('rallychart') && this.down('rallychart').destroy();
-
-        //var empId = record.get('empId'),
-        //    user = this.userTree.getUserItem(empId);
 
         if (showGrid){
             this._addDetailGrid(record);
@@ -488,22 +474,8 @@ Ext.define("manager-task-report", {
 
     },
     _addDetailGrid: function(user){
-        //var tasks = user.get('taskIds') || [];
-        //
-        //if (tasks.length === 0){
-        //    tasks[0] = 0;
-        //}
-        //this.logger.log('_addDetailGrid', user);
-        //var filters = _.map(tasks, function(t){ return {
-        //    property: 'ObjectID',
-        //    value: t
-        //    }
-        //});
-        //filters = Rally.data.wsapi.Filter.or(filters);
 
         var filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
-
-
 
         this.logger.log('_addDetailGrid filters', filters.toString());
 
