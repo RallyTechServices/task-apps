@@ -36,7 +36,7 @@ Ext.define('CArABU.technicalservices.ManagerTaskReport.Settings',{
                 labelWidth: labelWidth,
                 _isNotHidden: isNotHidden
         },{
-            xtype: 'rallycheckbox',
+            xtype: 'rallycheckboxfield',
             fieldLabel: 'Show Historical Data',
             labelAlign: 'right',
             labelWidth: labelWidth,

@@ -6,6 +6,7 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
 
     constructor: function(config) {
         this.employeeId = config && config.employeeId || null;
+        this.timestamp = new Date();
     },
     setUserData: function(userData){
         if (!this.userName){
@@ -20,15 +21,16 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
         this.objectID = userData.ObjectID || null;
     },
     addChild: function(child){
-        console.log('addChild', this.displayName, Ext.clone(this.children), this.children, this.getChildren().length,  child);
+
         //Check that child doesn't already exist...
-        var existingChild = Ext.Array.findBy(this.getChildren(), function(item){console.log('item',item,child); return item.employeeId.toString() === child.employeeId.toString();});
+        var existingChild = Ext.Array.findBy(this.getChildren(), function(item){return item.employeeId.toString() === child.employeeId.toString();});
         if (!existingChild) {
             this.getChildren().push(child);
         }
         this.leaf = false;
     },
     getChildren: function(){
+        console.log('getChildren', this.displayName, this.timestamp, Ext.clone(this.children), this.children);
         if (!this.children){
             this.children = [];
         }
@@ -143,9 +145,9 @@ Ext.define('CArABU.technicalservices.UserTree',{
         var user = this.getUserItem(empId),
             ids = [empId],
             children = user.getChildren();
-
+        console.log('--ids', ids, user);
         Ext.Array.each(children, function(c){
-            ids = ids.concat(this.getAllChildrenEmployeeIds(c.employeeId));
+            ids = ids.concat(this.getAllChildrenEmployeeIds(c.employeeId, true));
         }, this);
         this.logger.log('getAllChildrenEmployeeIds', empId, ids);
         return ids;
@@ -155,6 +157,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 this.userTree = {};
             }
             employeeId = employeeId.toString();
+            console.log('getUserItem', employeeId,this.userTree[employeeId] );
             if (!this.userTree[employeeId]){
                 this.userTree[employeeId] = Ext.create('CArABU.technicalservices.UserTreeItem',{
                     employeeId: employeeId
@@ -234,7 +237,7 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
     extend: "Ext.data.TreeModel",
 
     fields: [{
-        name: 'empId',
+        name: 'employeeId',
         displayName: 'Employee ID',
         defaultValue: null
     },{
