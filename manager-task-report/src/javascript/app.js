@@ -52,8 +52,10 @@ Ext.define("manager-task-report", {
         return this.getSetting('showHistoricalData') === "true" || this.getSetting('showHistoricalData') === true;
     },
     getHistoricalDate: function(){
-        var daysBack = this.getSetting('daysBack') || 7;
-        return Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',daysBack));
+        var daysBack = this.getSetting('daysBack') || 7,
+            backDate =Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',-daysBack));
+        this.logger.log('getHistoricalDate', backDate);
+        return backDate;
     },
     getIsManagerField: function(){
         return this.getSetting('isManagerField');
@@ -641,7 +643,13 @@ Ext.define("manager-task-report", {
                 dataIndex: 'deltaToDo',
                 menuDisabled: true,
                 renderer: function(value,meta_data,item) {
-                    return value;
+                    if (value < 0){
+                        return '<div class="icon-down"></div>' + Math.abs(value);
+                    }
+                    if (value > 0){
+                        return '<div class="icon-up"></div>' + value;
+                    }
+                    return "No Change";
                 }
             });
         }

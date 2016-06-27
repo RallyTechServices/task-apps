@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 27 2016 07:16:50 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Jun 27 2016 07:36:49 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 27 2016 07:16:50 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Jun 27 2016 07:36:49 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 39829584448;
+        var CHECKSUM = 39831738146;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -430,7 +430,8 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
                 ObjectID: t.get('ObjectID'),
                 ToDo: t.get('ToDo'),
                 Estimate: t.get('Estimate'),
-                State: t.get('State')
+                State: t.get('State'),
+                validDate: t.get('__ValidFrom') || new Date()
             });
         });
         if (historical){
@@ -488,7 +489,7 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
         }
         this.historicalToDo += Ext.Array.sum(Ext.Array.pluck(this.getHistoricalTasks(), 'ToDo'));
 
-        this.deltaToDo = this.historicalToDo - this.ToDo;
+        this.deltaToDo = this.ToDo - this.historicalToDo;
     }
 
 });
@@ -557,7 +558,6 @@ Ext.define('CArABU.technicalservices.UserTree',{
         var employeeIdField = this.employeeIDField,
             managerIDField = this.managerIDField,
             tasksByEmpId = {};
-        this.logger.log('processTasks', this.userTree, this.getUserItem("316380").getChildren().length);
 
         Ext.Array.each(records, function(r){
             var empId = r.get('Owner') && r.get('Owner')[employeeIdField];
@@ -576,17 +576,14 @@ Ext.define('CArABU.technicalservices.UserTree',{
 
                 var userObj = this.getUserItem(empId);
                 userObj.setUserData(owner);
-                console.log('owner',owner);
 
                 userObj.addTasks(tasks);
                 if (mgrID && mgrID.length > 0){
                     var mgrObj = this.getUserItem(mgrID);
-                    console.log('mgrId',mgrID,mgrObj,mgrObj.displayName);
                     mgrObj.addChild(userObj);
                 }
             }
         }, this);
-        this.logger.log('processTasks after',this.userTree, this.getUserItem("316380").getChildren().length);
 
         var snapsByOwner = {},
             userOids = [];
@@ -607,7 +604,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 usersByObjectID[userObjectId] = user;
             }
         });
-
+        this.logger.log('usersByObjectID', usersByObjectID, snapsByOwner);
         Ext.Object.each(snapsByOwner, function(objectId, snaps){
             var userObject = usersByObjectID[objectId.toString()];
             if (userObject){
@@ -649,8 +646,6 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
         name: 'deltaToDo'
     },{
         name: 'taskIds'
-    },{
-        name: 'children'
     }]
 });
 
@@ -708,8 +703,10 @@ Ext.define("manager-task-report", {
         return this.getSetting('showHistoricalData') === "true" || this.getSetting('showHistoricalData') === true;
     },
     getHistoricalDate: function(){
-        var daysBack = this.getSetting('daysBack') || 7;
-        return Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',daysBack));
+        var daysBack = this.getSetting('daysBack') || 7,
+            backDate =Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',-daysBack));
+        this.logger.log('getHistoricalDate', backDate);
+        return backDate;
     },
     getIsManagerField: function(){
         return this.getSetting('isManagerField');
@@ -1297,7 +1294,13 @@ Ext.define("manager-task-report", {
                 dataIndex: 'deltaToDo',
                 menuDisabled: true,
                 renderer: function(value,meta_data,item) {
-                    return value;
+                    if (value < 0){
+                        return '<div class="icon-down"></div>' + Math.abs(value);
+                    }
+                    if (value > 0){
+                        return '<div class="icon-up"></div>' + value;
+                    }
+                    return "No Change";
                 }
             });
         }

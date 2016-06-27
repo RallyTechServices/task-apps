@@ -43,7 +43,8 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
                 ObjectID: t.get('ObjectID'),
                 ToDo: t.get('ToDo'),
                 Estimate: t.get('Estimate'),
-                State: t.get('State')
+                State: t.get('State'),
+                validDate: t.get('__ValidFrom') || new Date()
             });
         });
         if (historical){
@@ -101,7 +102,7 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
         }
         this.historicalToDo += Ext.Array.sum(Ext.Array.pluck(this.getHistoricalTasks(), 'ToDo'));
 
-        this.deltaToDo = this.historicalToDo - this.ToDo;
+        this.deltaToDo = this.ToDo - this.historicalToDo;
     }
 
 });
@@ -170,7 +171,6 @@ Ext.define('CArABU.technicalservices.UserTree',{
         var employeeIdField = this.employeeIDField,
             managerIDField = this.managerIDField,
             tasksByEmpId = {};
-        this.logger.log('processTasks', this.userTree, this.getUserItem("316380").getChildren().length);
 
         Ext.Array.each(records, function(r){
             var empId = r.get('Owner') && r.get('Owner')[employeeIdField];
@@ -189,17 +189,14 @@ Ext.define('CArABU.technicalservices.UserTree',{
 
                 var userObj = this.getUserItem(empId);
                 userObj.setUserData(owner);
-                console.log('owner',owner);
 
                 userObj.addTasks(tasks);
                 if (mgrID && mgrID.length > 0){
                     var mgrObj = this.getUserItem(mgrID);
-                    console.log('mgrId',mgrID,mgrObj,mgrObj.displayName);
                     mgrObj.addChild(userObj);
                 }
             }
         }, this);
-        this.logger.log('processTasks after',this.userTree, this.getUserItem("316380").getChildren().length);
 
         var snapsByOwner = {},
             userOids = [];
@@ -220,7 +217,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 usersByObjectID[userObjectId] = user;
             }
         });
-
+        this.logger.log('usersByObjectID', usersByObjectID, snapsByOwner);
         Ext.Object.each(snapsByOwner, function(objectId, snaps){
             var userObject = usersByObjectID[objectId.toString()];
             if (userObject){
@@ -262,7 +259,5 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
         name: 'deltaToDo'
     },{
         name: 'taskIds'
-    },{
-        name: 'children'
     }]
 });
