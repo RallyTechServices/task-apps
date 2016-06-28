@@ -3,14 +3,14 @@
 <head>
     <title>Manager Task Report</title>
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 27 2016 07:36:49 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Jun 27 2016 18:02:09 GMT-0600 (MDT)";
     </script>
     
     <script type="text/javascript" src="https://rally1.rallydev.com//apps/2.1/sdk-debug.js?apiKey=_PUT_APIKEY_HERE_"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
-            Rally.loadScripts(["src/javascript/utils/__ts-info-link.js","src/javascript/utils/__ts-logger.js","src/javascript/utils/burndown-calculator.js","src/javascript/utils/settings.js","src/javascript/utils/task-model-builder.js","src/javascript/utils/user-manager-store.js","src/javascript/utils/user-task-summary-model.js","src/javascript/app.js"],
+            Rally.loadScripts(["src/javascript/utils/__ts-info-link.js","src/javascript/utils/__ts-logger.js","src/javascript/utils/burndown-calculator.js","src/javascript/utils/overrides.js","src/javascript/utils/settings.js","src/javascript/utils/task-model-builder.js","src/javascript/utils/template-columns.js","src/javascript/utils/user-manager-store.js","src/javascript/utils/user-task-summary-model.js","src/javascript/app.js"],
 	            function() {
 	                Rally.launchApp('manager-task-report', {
 	                    name: 'Manager Task Report'

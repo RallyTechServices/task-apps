@@ -12,7 +12,7 @@ Ext.define("manager-task-report", {
             costCenter: null,
             isManagerField: 'c_IsManager',
             showHistoricalData: true,
-            daysBack: 14
+            daysBack: 7
         }
     },
 
@@ -303,7 +303,8 @@ Ext.define("manager-task-report", {
             failure: function(msg){
                 Rally.ui.notify.Notifier.showError({ message: "Error loading historical task summary data:  " + msg });
                 deferred.resolve([]);
-            }
+            },
+            scope: this
         });
 
         return deferred;
@@ -366,7 +367,6 @@ Ext.define("manager-task-report", {
                         this._toggleDetail(btn,state,record);
                     },
                     render: function(btn){
-
                         this._toggleDetail(btn, defaultShowGrid, record);
                     },
                     scope: this
@@ -412,6 +412,7 @@ Ext.define("manager-task-report", {
 
         this.down('#detail_box').add({
             xtype: 'rallychart',
+            loadMask: false,
             storeType: 'Rally.data.lookback.SnapshotStore',
             storeConfig: {
                 find: {
@@ -477,14 +478,17 @@ Ext.define("manager-task-report", {
     },
     _addDetailGrid: function(user){
 
-        var filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
+        var employeeId = user.get('employeeId'),
+            filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
 
         this.logger.log('_addDetailGrid filters', filters.toString());
+
 
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
                     autoLoad: false,
                     enableHierarchy: true,
+                    fetch: this.getTaskFetchList(),
                     filters: filters
                 }).then({
                     success: function(store) {
@@ -493,15 +497,15 @@ Ext.define("manager-task-report", {
                             context: this.getContext(),
                             modelNames: ['task'],
                             stateful: false,
-                            stateId: "grid-2",
+                            stateId: "grid-13",
                             itemId: 'detail-grid',
                             toggleState: 'grid',
                             plugins: [{
                                 ptype: 'rallygridboardfieldpicker',
                                 headerPosition: 'left',
-                                modelNames: ['extendedTask'],
+                                modelNames: ['task'],
                                 stateful: true,
-                                stateId: this.getContext().getScopedStateId('detail-columns-2')
+                                stateId: this.getContext().getScopedStateId('detail-columns-13')
                             },{
                                 ptype: 'rallygridboardinlinefiltercontrol',
                                 inlineFilterButtonConfig: {
@@ -541,18 +545,15 @@ Ext.define("manager-task-report", {
                                 store: store,
                                 storeConfig: {
                                     filters: filters,
+                                   // fetch: this.getTaskFetchList(),
                                     load: function(store, records, success){
                                         console.log('load', records)
                                     }
                                 },
                                 rankColumnDataIndex: 'TaskIndex',
-                                columnCfgs: [
-                                    'FormattedID',
-                                    'Name',
-                                    'State',
-                                    'Owner',
-                                    'ToDo'
-                                ]
+                                enableRanking: false,
+                                columnCfgs: this._getDetailColumnCfgs(),
+                                derivedColumns: this._getDefaultColumns()
                             },
                             height: 400
                         });
@@ -564,8 +565,14 @@ Ext.define("manager-task-report", {
 
 
     },
-    _getDetailColumnCfgs: function(){
+    _getDefaultColumns: function(){
         return [{
+            text: '% Completed',
+            xtype: 'pctcompletetemplatecolumn'
+        }];
+    },
+    _getDetailColumnCfgs: function(){
+       var columns = [{
             dataIndex: 'FormattedID'
         },{
             dataIndex: 'Name',
@@ -584,6 +591,8 @@ Ext.define("manager-task-report", {
                 return v._refObjectName;
             }
         }];
+
+        return columns.concat(this._getDefaultColumns());
     },
     _getSummaryStoreColumnCfgs: function(){
         var columns = [
