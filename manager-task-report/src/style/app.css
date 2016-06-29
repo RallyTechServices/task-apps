@@ -1,0 +1,46 @@
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.configuration-error {
+    color: red;
+}
+
+.historical-state {
+    background-color: #888!important;
+    border-radius: 2px;
+    height: 16px!important;
+    width: 18px!important;
+}
+
+.historical-before-state {
+    background-color: #d6d6d6!important;
+}
+.historical-schedule-state {
+    background-color: white;
+    color: white;
+    float: left;
+    font-family: NotoSansBold,Helvetica,Arial;
+    font-size: 12px;
+    height: 14px;
+    max-width: 18px;
+    text-align: center;
+}
+.history {
+    color: #A9A9A9!important;
+    padding: 5px;
+}

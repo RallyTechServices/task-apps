@@ -1,0 +1,1909 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manager Task Report</title>
+    <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
+    <!--  Build Date: Tue Jun 28 2016 18:48:08 GMT-0600 (MDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Tue Jun 28 2016 18:48:08 GMT-0600 (MDT)";
+        var BUILDER = "kcorkan";
+        var CHECKSUM = 81355920886;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Rally.ui.dialog.Dialog',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+    title: "Build Information",
+    
+    defaults: { padding: 5, margin: 5 },
+
+    closable: true,
+     
+    draggable: true,
+
+    autoShow: true,
+   
+    width: 350,
+    
+    informationalConfig: null,
+    
+    items: [{xtype:'container', itemId:'information' }],
+    
+    initComponent: function() {
+        var id = Ext.id(this);
+        this.title =  "<span class='icon-help'> </span>" + this.title;
+        this.callParent(arguments);
+    },
+    
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/var BUILDER = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+       
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+   
+        return chk;
+    },
+    
+    _checkChecksum: function(container) {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    var stored_checksum = me._generateChecksum(text);
+                    if ( CHECKSUM !== stored_checksum ) {
+                        deferred.resolve(false);
+                        return;
+                    }
+                }
+                deferred.resolve(true);
+            }
+        });
+        
+        return deferred.promise;
+    },
+    
+    _addToContainer: function(container){
+        var config = Ext.apply({
+            xtype:'container',
+            height: 200,
+            overflowY: true
+        }, this.informationalConfig);
+        
+        container.add(config);
+    },
+    
+    afterRender: function() {
+        var app = Rally.getApp();
+        
+        if ( !Ext.isEmpty( this.informationalConfig ) ) {
+            var container = this.down('#information');
+            this._addToContainer(container);
+            
+        }
+        
+        if (! app.isExternal() ) {
+            this._checkChecksum(app).then({
+                scope: this,
+                success: function(result){
+                    if ( !result ) {
+                        this.addDocked({
+                            xtype:'container',
+                            cls: 'build-info',
+                            dock: 'bottom',
+                            padding: 2,
+                            html:'<span class="icon-warning"> </span>Checksums do not match'
+                        });
+                    }
+                },
+                failure: function(msg){
+                    console.log("oops:",msg);
+                }
+            });
+        } else {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html:'... Running externally'
+            });
+        }
+        this.callParent(arguments);
+    },
+    
+    beforeRender: function() {
+        var me = this;
+        this.callParent(arguments);
+
+        if (this.informationHtml) {
+            this.addDocked({
+                xtype: 'component',
+                componentCls: 'intro-panel',
+                padding: 2,
+                html: this.informationHtml,
+                doc: 'top'
+            });
+        }
+        
+        this.addDocked({
+            xtype:'container',
+            cls: 'build-info',
+            padding: 2,
+            dock:'bottom',
+            html:"This app was created by the CA AC Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html: Ext.String.format("Build date/time: {0} ({1})",
+                    APP_BUILD_DATE,
+                    BUILDER)
+            });
+        }
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define("CArABU.technicalservices.BurndownCalculator", {
+    extend: "Rally.data.lookback.calculator.TimeSeriesCalculator",
+    completedStates: ['Completed'],
+
+    getDerivedFieldsOnInput: function() {
+
+        return [
+            {
+                "as": "Estimated",
+                "f": function(snapshot) {
+                    if (snapshot.Estimate) {
+                        return snapshot.Estimate;
+                    }
+
+                    return 0;
+                }
+            },
+            {
+                "as": "Remaining",
+                "f": function(snapshot) {
+                    if (snapshot.ToDo){ //(_.contains(completedScheduleStateNames, snapshot.ScheduleState) && snapshot.PlanEstimate) {
+                        return snapshot.ToDo;
+                    }
+                    return 0;
+                }
+            }
+        ];
+    },
+
+    getMetrics: function() {
+        return [
+            {
+                "field": "Estimated",
+                "as": "Estimated",
+                "display": "line",
+                "f": "sum"
+            },
+            {
+                "field": "Remaining",
+                "as": "Remaining",
+                "f": "sum",
+                "display": "column"
+            }
+        ];
+    }
+});
+Ext.override(Rally.ui.grid.TreeGrid, {
+    _mergeColumnConfigs: function(newColumns, oldColumns) {
+
+        var mergedColumns= _.map(newColumns, function(newColumn) {
+            var oldColumn = _.find(oldColumns, {dataIndex: this._getColumnName(newColumn)});
+            if (oldColumn) {
+                return this._getColumnConfigFromColumn(oldColumn);
+            }
+
+            return newColumn;
+        }, this);
+
+        mergedColumns = mergedColumns.concat(this.config.derivedColumns);
+        return mergedColumns;
+    },
+    _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
+        return _(this.headerCt.items.getRange()).map(function(column) {
+            //override:  Added additional search for column.text
+            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, dataIndex: column.dataIndex });
+        }).compact().value();
+    }
+});
+
+Ext.override(Rally.ui.renderer.RendererFactory, {
+    typeFieldTemplates: {
+        defectsuite: {
+            state: function(field) {
+                return Ext.create('Rally.ui.renderer.template.DefectSuiteStateTemplate', {
+                    field: field
+                });
+            }
+        },
+        milestone: {
+            formattedid: function(field) {
+                return Ext.create('Rally.ui.renderer.template.FormattedIDTemplate');
+            }
+        },
+        task: {
+            state: function(field) {
+                return Ext.create('Rally.ui.renderer.template.ScheduleStateTemplate', {
+                    field: field,
+                    showTrigger: true
+                });
+            },
+            estimate: function(field){
+                return Ext.create('Rally.ui.renderer.template.DecimalTemplate', {
+                    fieldName: field.name,
+                    maxFractionalDigits: field.attributeDefinition ? field.attributeDefinition.MaxFractionalDigits : -1
+                });
+
+            }
+        },
+        testcase: {
+            lastbuild: function(field) {
+                return Ext.create('Rally.ui.renderer.template.LastBuildTemplate');
+            }
+        },
+        recyclebinentry: {
+            type: function(field) {
+                return Ext.create('Rally.ui.renderer.template.TypeDefNameTemplate', {
+                    fieldName: field.name
+                });
+            }
+        }
+    },
+});
+Ext.define('CArABU.technicalservices.ManagerTaskReport.Settings',{
+    singleton: true,
+    getFields: function(){
+        var width = 400,
+            labelWidth = 200;
+
+        var isNotHidden = function(field){
+            return field.custom && field.attributeDefinition && field.attributeDefinition.AttributeType === "STRING";
+        };
+
+        return [{
+                xtype: 'rallyfieldcombobox',
+                fieldLabel: 'Is Manager Field',
+                labelAlign: 'right',
+                name: 'isManagerField',
+                model: 'User',
+                width: width,
+                labelWidth: labelWidth,
+            _isNotHidden: isNotHidden
+            },{
+                xtype: 'rallyfieldcombobox',
+                fieldLabel: 'Manager Employee ID Field',
+                labelAlign: 'right',
+                name: 'managerEmployeeIDField',
+                model: 'User',
+                width: width,
+                labelWidth: labelWidth,
+            _isNotHidden: isNotHidden
+            },{
+                xtype: 'rallyfieldcombobox',
+                fieldLabel: 'Employee ID Field',
+                labelAlign: 'right',
+                name: 'employeeIDField',
+                model: 'User',
+                width: width,
+                labelWidth: labelWidth,
+                _isNotHidden: isNotHidden
+        },{
+            xtype: 'rallycheckboxfield',
+            fieldLabel: 'Show Historical Data',
+            labelAlign: 'right',
+            labelWidth: labelWidth,
+            name: 'showHistoricalData'
+        },{
+            xtype: 'rallynumberfield',
+            fieldLabel: 'Days Back (Historical Data)',
+            labelAlign: 'right',
+            labelWidth: labelWidth,
+            name: 'daysBack',
+            minValue: 7,
+            maxValue: 366
+        }];
+    }
+});
+
+Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
+    extend: 'Ext.XTemplate',
+
+    /**
+     * @cfg {String}
+     * define a width if necessary to fit where it's being used
+     */
+    width: '100%',
+    /**
+     * @cfg {String}
+     * define a height if necessary to fit where it's being used
+     */
+    height: '20px',
+
+    /**
+     * @cfg {Function}
+     * A function that should return true to show a triangle in the top right to denote something is missing.
+     * Defaults to:
+     *      function(){ return false; }
+     */
+    showDangerNotificationFn: function(values) {
+        console.log('showDangerNotificationFn',values);
+        if (!values["Estimate"]){
+            return true;
+        }
+        return false;
+    },
+
+    /**
+     * @cfg {Function} (required)
+     * A function that returns the color for the percent done bar in hex
+     */
+
+
+    /**
+     * @cfg {Boolean} (optional)
+     * A boolean that indicates whether the progress bar is clickable
+     */
+    isClickable: false,
+
+    /**
+     * @cfg {Boolean}
+     * If the percent done is 0%, do not show the bar at all
+     */
+    showOnlyIfInProgress: false,
+
+    /**
+     * @cfg {Function}
+     * A function that returns the text to show in the progress bar.
+     * Defaults to a function that returns the percentage complete.
+     */
+    generateLabelTextFn: function (recordData) {
+        console.log('generateLabelTextFn',recordData);
+        return this.calculatePercent(recordData) + '%';
+    },
+
+    config: {
+        denominatorField: 'Estimate',
+        numeratorField: 'ToDo',
+        shouldShowPercentDone: function(recordData) {
+            var value = recordData["Estimate"];
+            if (_.isString(value)) {
+                value = +value;
+            }
+
+            if(!Ext.isNumber(value)){
+                return false;
+            }
+
+            if (this.showOnlyIfInProgress) {
+                return value > 0;
+            }
+            return true;
+
+        },
+        calculateColorFn: function(){
+            return Rally.util.Colors.lime; //'#8DC63F';
+        },
+        calculatePercent: function (recordData) {
+            if (recordData["State"] === "Completed"){
+                return 100;
+            }
+
+            var denominator = recordData["Estimate"] || 0,
+                numerator = recordData["ToDo"] || 0;
+
+            var percentDone = denominator ? (denominator - numerator)/denominator : 0;
+            return Math.round(percentDone * 100);
+        },
+        getContainerClass: function(recordData) {
+            return '';
+        },
+        getClickableClass: function(){
+            return this.isClickable ? 'clickable' : '';
+        },
+        getDimensionStyle: function(){
+            return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
+        },
+        calculateWidth: function (recordData) {
+            var percentDone = this.calculatePercent(recordData);
+            return percentDone > 100 ? '100%' : percentDone + '%';
+        }
+    },
+
+    constructor: function(config) {
+        var templateConfig = config && config.template || [
+                '<tpl>',
+                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div class="rly-progress-bar" style="background-color: {[this.calculateColorFn(values)]}; width: {[this.calculateWidth(values)]}; "></div>',
+                '<tpl if="this.showDangerNotificationFn(values)">',
+                '<div class="progress-bar-danger-notification"></div>',
+                '</tpl>',
+                '<div class="progress-bar-label">',
+                '{[this.generateLabelTextFn(values)]}',
+                '</div>',
+                '</div>',
+                '</tpl>'
+            ];
+
+        templateConfig.push(this.config);
+        templateConfig.push(config);
+
+        return this.callParent(templateConfig);
+    }
+});
+
+Ext.define('CArABU.technicalservices.PctCompleteTemplateColumn', {
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.pctcompletetemplatecolumn'],
+
+    align: 'right',
+
+    initComponent: function(){
+        var me = this;
+
+        me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
+            denominatorField: me.denominatorField,
+            numeratorField: me.numeratorField
+        });
+        me.callParent(arguments);
+    },
+    getValue: function(){
+
+        if (!values[this.denominatorField]){
+            return "--"
+        }
+        var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
+        return remaining/values[this.denominatorField];
+    },
+    defaultRenderer: function(value, meta, record) {
+        var data = Ext.apply({}, record.getData()); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+
+Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.historicalstatetemplate'],
+
+    align: 'right',
+
+    initComponent: function(){
+        var me = this;
+        console.log('this', this);
+
+        me.tpl = Ext.create('Ext.XTemplate',
+            '<div aria-label="Edit Schedule State: {ScheduleState}" class="schedule-state-wrapper " style="width: 100%">',
+                '{[this.renderStates(values)]}',
+            '</div>',
+            {
+                getHistoricalState: function(values){
+
+                    var snap = Ext.Array.filter(this.historicalRecords, function(r){
+                        return r.get('ObjectID') === values['ObjectID'];
+                    });
+                    console.log('getHistoricalField', values, snap)
+                    if (snap && snap.length > 0){
+                        return snap[0].get(this.historyField) || "";
+                    }
+                    return "";
+                },
+                renderStates: function(recordData) {
+                    var states = ["Defined","In-Progress","Completed"];
+                    var stateUsed = true;
+                    var returnVal = [];
+                    var currentState = recordData["State"];
+                    var previousState = this.getHistoricalState(recordData);
+                    var blockWidth = Math.floor((85/(states.length))-3);
+
+                    if (!previousState){ stateUsed = false; }
+                    Ext.each(states, function(state, index) {
+                        //don't add spacer at the front
+                        if(index !== 0) {
+                            returnVal.push('<span class="schedule-state-spacer"></span>');
+                        }
+
+                        //render an individual state block
+                        returnVal.push('<div state-data="' + state + '" class="historical-schedule-state');
+
+                        if (stateUsed) {
+                            returnVal.push(' historical-before-state');
+                        }
+
+                        if (state === previousState) {
+                            var symbolState = this._getSymbolState(recordData, state);
+                            returnVal.push(' historical-state');
+                            returnVal.push('" style="width:' + blockWidth*2 + '%">&nbsp;' + symbolState + '&nbsp;</div>');
+
+                        } else {
+                            returnVal.push(' clickable-state');
+                            returnVal.push('" style="width:' + blockWidth + '%">&nbsp;</div>');
+                        }
+
+                        //flip the switch so remaining states are gray
+                        if(state === currentState) {
+                            stateUsed = false;
+                        }
+                    }, this);
+
+                    //if(this.showTrigger){
+                    //    returnVal.push('<div class="editor-trigger icon-chevron-down"></div>');
+                    //}
+                    console.log('renderStates', returnVal);
+                    return returnVal.join('');
+                },
+                _getSymbolState: function(recordData, state) {
+                    var symbolState = state === 'In-Progress' ? 'P' : state.charAt(0);
+                    return symbolState;
+                },
+                historyField: me.historyField,
+                historicalRecords: me.historicalRecords
+        });
+        me.callParent(arguments);
+    },
+    getValue: function(){
+        return "";
+    },
+    defaultRenderer: function(value, meta, record) {
+        var data = Ext.apply({}, record.getData()); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+
+
+Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.historicaldeltatemplate'],
+
+    align: 'right',
+
+    initComponent: function(){
+        var me = this;
+        console.log('this', this);
+
+        me.tpl = Ext.create('Ext.XTemplate',
+            '<div class="{[this.getDeltaDirection(values)]}"></div><span style="color:#A9A9A9">{[this.getDelta(values)]}</span>',{
+                getDeltaDirection: function(values){
+
+                    var field = this.deltaField,
+                        historicalValue = this.getHistoricalValue(values, field) || 0,
+                        currentValue = values[field] || 0;
+
+                    if (currentValue === historicalValue){
+                        return "icon-none history";
+                    }
+                    return currentValue > historicalValue ? "icon-up history" : "icon-down history";
+                },
+                getDelta: function(values){
+                    var field = this.deltaField,
+                        historicalValue = this.getHistoricalValue(values, field) || 0,
+                        currentValue = values[field] || 0;
+
+                    if (currentValue === historicalValue){
+                        return "";
+                    }
+                    return Math.abs(currentValue - historicalValue);
+                },
+                getHistoricalValue: function(values, field){
+
+                    var snap = Ext.Array.filter(this.historicalRecords, function(r){
+                        return r.get('ObjectID') === values['ObjectID'];
+                    });
+
+                    if (snap && snap.length > 0){
+                        return snap[0].get(field) || "";
+                    }
+                    return "";
+                },
+                deltaField: me.deltaField,
+                historicalRecords: me.historicalRecords
+            });
+        me.callParent(arguments);
+    },
+    getValue: function(){
+        return "";
+    },
+    defaultRenderer: function(value, meta, record) {
+        var data = Ext.apply({}, record.getData()); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+
+Ext.define('CArABU.technicalservices.WorkProductTemplateColumn',{
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.workproducttemplatecolumn'],
+
+    getTemplateType: function(field){
+        if (field === 'Milestones'){
+            return Ext.create('Rally.ui.renderer.template.PillTemplate', { collectionName: 'Milestones', iconCls: 'icon-milestone', cls: 'milestone-pill'});
+        }
+        if (field === "Predecessors"){
+            return Ext.create('Rally.ui.renderer.template.status.PredecessorsAndSuccessorsStatusTemplate');
+        }
+
+        if (field === "Feature"){
+            return Ext.create('Rally.ui.renderer.template.FeatureTemplate');
+        }
+
+        if (field === "Initiative"){
+            return Ext.create('CArABU.technicalservices.InitiativeTemplate');
+        }
+        return "";
+    },
+
+    align: 'center',
+    initComponent: function(){
+        var me = this;
+
+        me.tpl = this.getTemplateType(me.workProductField);
+
+        me.callParent(arguments);
+    },
+    getValue: function(){
+        return "";
+    },
+    defaultRenderer: function(value, meta, record) {
+        var storyRecord = record.get('WorkProduct');
+        var data = Ext.apply({}, storyRecord); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+
+Ext.define('CArABU.technicalservices.InitiativeTemplate',{
+    extend: 'Ext.XTemplate',
+
+    constructor: function(config) {
+        var templateConfig = [
+            '<tpl if="this.getParent(values)">{[this.createDetailUrl(values)]}</tpl>',
+            {
+                getParent:function (recordData) {
+                    return recordData && recordData.Feature && recordData.Feature.Parent
+                },
+                createDetailUrl:function (recordData) {
+                    var parent = this.getParent(recordData);
+                    return Rally.util.DetailLink.getLink({
+                            record: parent,
+                            showHover: !!this.showHover,
+                            text: parent.FormattedID
+                        }) + ': ' + parent._refObjectName;
+                }
+            }
+        ];
+
+        return this.callParent(templateConfig);
+    }
+});
+Ext.define('CArABU.technicalservices.UserManagerStore',{
+    logger: new Rally.technicalservices.Logger(),
+    mixins: {
+        observable: 'Ext.util.Observable'
+    },
+
+    fetch: ['UserName','Email','First Name','Last Name','DisplayName'],
+
+    constructor: function(config){
+        Ext.apply(this,config);
+        this.mixins.observable.constructor.call(this, config);
+
+        this.employeeIDField = config.employeeIDField;
+        this.managerIDField = config.managerEmployeeIDField;
+        this.costCenterField = config.costCenterField;
+        this.isManagerField = config.isManagerField;
+
+        this._loadUserModel().then({
+            success: function(model){
+                if (this._validateFields(model)){
+                    this.fireEvent('ready');
+                }
+            },
+             scope: this
+        });
+    },
+    _loadUserModel: function(){
+        return Rally.data.ModelFactory.getModel({
+            type: 'User'
+        });
+    },
+    _validateFields: function(model){
+        var missingFields = [];
+        if (!model.getField(this.employeeIDField)){
+            missingFields.push("Employee ID Field (" + this.employeeIDField + ")");
+        }
+        if (!model.getField(this.managerIDField)){
+            missingFields.push("Manager ID Field (" + this.managerIDField + ")");
+        }
+        if (!model.getField(this.costCenterField)){
+            missingFields.push("Cost Center Field (" + this.costCenterField + ")");
+        }
+        if (missingFields.length > 0){
+            this.fireEvent('configurationerror', Ext.String.format("The following custom fields are missing from the User Model:<br/>{0}<br/><br/> Please add these fields or use the app settings to configure the appropriate fields.", missingFields.join('<br/>')))
+            return false;
+        }
+        return true;
+
+    },
+
+    buildManagerTree: function(managerId, records){
+        this.logger.log('buildManagerTree', this.managerEmployeeIDField, this.employeeIDField);
+        var managerTree = Ext.create('CArABU.technicalservices.UserTree',{
+            root: managerId,
+            users: records,
+            managerIDField: this.managerEmployeeIDField,
+            employeeIDField: this.employeeIDField
+        });
+        this.logger.log('buildManagerTree managerTree', managerTree);
+        return managerTree;
+    }
+});
+
+Ext.define('CArABU.technicalservices.UserTreeItem',{
+    empId: null,
+    children: null,
+    leaf: true,
+    tasks: null,
+
+    constructor: function(config) {
+        this.employeeId = config && config.employeeId || null;
+        this.timestamp = new Date();
+    },
+    setUserData: function(userData){
+        if (!this.userName){
+            this.userName = userData.UserName || null;
+        }
+        if (!this.displayName){
+            this.displayName = userData.DisplayName || userData._refObjectName || userData.UserName;
+            if (userData.FirstName && userData.LastName){
+                this.displayName = userData.FirstName + ' ' + userData.LastName;
+            }
+        }
+        this.objectID = userData.ObjectID || null;
+    },
+    addChild: function(child){
+
+        //Check that child doesn't already exist...
+        var existingChild = Ext.Array.findBy(this.getChildren(), function(item){return item.employeeId.toString() === child.employeeId.toString();});
+        if (!existingChild) {
+            this.getChildren().push(child);
+        }
+        this.leaf = false;
+    },
+    getChildren: function(){
+        console.log('getChildren', this.displayName, this.timestamp, Ext.clone(this.children), this.children);
+        if (!this.children){
+            this.children = [];
+        }
+        return this.children;
+    },
+    addTasks: function(tasks, historical){
+        var userTasks = [];
+        Ext.Array.each(tasks, function(t){
+            userTasks.push({
+                ObjectID: t.get('ObjectID'),
+                ToDo: t.get('ToDo'),
+                Estimate: t.get('Estimate'),
+                State: t.get('State'),
+                validDate: t.get('__ValidFrom') || new Date()
+            });
+        });
+        if (historical){
+            this.historicalTasks = userTasks;
+        } else {
+            this.taskIds = _.pluck(userTasks, 'ObjectID');
+            this.currentTasks = userTasks;
+        }
+    },
+    getCurrentTasks: function(){
+        return this.currentTasks || [];
+    },
+    getHistoricalTasks: function(){
+        return this.historicalTasks || [];
+    },
+    doCalculations: function(noRollup) {
+        this.ToDo = 0;
+        this.numDefined = 0;
+        this.numInProgress = 0;
+        this.numCompleted = 0;
+        this.totalCount = 0;
+        this.totalEffort = 0;
+
+        if (!noRollup){
+            Ext.Array.each(this.getChildren(), function (child) {
+                child.doCalculations();
+                this.ToDo += child.ToDo;
+                this.numDefined += child.numDefined;
+                this.numInProgress += child.numInProgress;
+                this.numCompleted += child.numCompleted;
+                this.totalEffort += child.totalEffort;
+                this.totalCount += child.totalCount;
+                this.taskIds = Ext.Array.merge(this.taskIds, child.taskIds || []);
+            }, this);
+        }
+
+        this.ToDo += Ext.Array.sum(Ext.Array.pluck(this.getCurrentTasks(), 'ToDo'));
+        this.totalCount += this.getCurrentTasks().length;
+        this.totalEffort += Ext.Array.sum(Ext.Array.pluck(this.getCurrentTasks(), 'Estimate'));
+        this.numDefined += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "Defined"; }).length;
+        this.numInProgress += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "In-Progress"; }).length;
+        this.numCompleted += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "Completed"; }).length;
+
+        this.pctCompleteEffort = this.totalEffort > 0 ? (this.totalEffort - this.ToDo)/this.totalEffort : 0;
+        this.pctCompleteCount = this.totalCount > 0 ? this.numCompleted/this.totalCount : 0;
+    },
+    doHistoricalCalculations: function(noRollup){
+        this.historicalToDo = 0;
+
+        if (!noRollup){
+            Ext.Array.each(this.getChildren(), function (child) {
+                child.doHistoricalCalculations();
+                this.historicalToDo += child.historicalToDo;
+            }, this);
+        }
+        this.historicalToDo += Ext.Array.sum(Ext.Array.pluck(this.getHistoricalTasks(), 'ToDo'));
+
+        this.deltaToDo = this.ToDo - this.historicalToDo;
+    }
+
+});
+
+Ext.define('CArABU.technicalservices.UserTree',{
+    logger: new Rally.technicalservices.Logger(),
+    constructor: function(config){
+        this.logger.log('config', config);
+        var users = config && config.users || [];
+        var managerId = config && config.managerId || null;
+
+        this.employeeIDField = config.employeeIDField;
+        this.managerIDField = config.managerIDField;
+
+        if (users && users.length > 0){
+            this._initializeUsers(users, managerId);
+        }
+
+    },
+    _initializeUsers: function(users, rootId){
+        Ext.Array.each(users, function(r){
+            var empId = r.get(this.employeeIDField);
+            if (empId){
+                var userObj = this.getUserItem(empId),
+                    mgrID = r.get(this.managerIDField);
+
+                userObj.setUserData(r.getData());
+
+                if (mgrID && mgrID.length > 0){
+                    var mgrObj = this.getUserItem(mgrID);
+                    mgrObj.addChild(userObj);
+                }
+            }
+            console.log('users', this.userTree, empId, this.employeeIDField);
+        }, this);
+
+        //Todo clean out all users other than root.
+        this.logger.log('_initializeUsers', this.userTree);
+    },
+    getAllChildrenEmployeeIds: function(empId){
+        var user = this.getUserItem(empId),
+            ids = [empId],
+            children = user.getChildren();
+
+        Ext.Array.each(children, function(c){
+            ids = ids.concat(this.getAllChildrenEmployeeIds(c.employeeId, true));
+        }, this);
+        this.logger.log('getAllChildrenEmployeeIds', empId, ids);
+        return ids;
+    },
+    getUserItem: function(employeeId){
+            if (!this.userTree){
+                this.userTree = {};
+            }
+            employeeId = employeeId.toString();
+            console.log('getUserItem', employeeId,this.userTree[employeeId] && this.userTree[employeeId].displayName, this.userTree[employeeId] && this.userTree[employeeId].getChildren().length );
+            if (!this.userTree[employeeId]){
+                this.userTree[employeeId] = Ext.create('CArABU.technicalservices.UserTreeItem',{
+                    employeeId: employeeId
+                }); //{text: employeeId, empId: employeeId, user: null, children: [], leaf: true, tasks: []};
+            }
+            return this.userTree[employeeId];
+    },
+
+    processTasks: function(records, snapshots, managerId){
+        var employeeIdField = this.employeeIDField,
+            managerIDField = this.managerIDField,
+            tasksByEmpId = {};
+
+        Ext.Array.each(records, function(r){
+            var empId = r.get('Owner') && r.get('Owner')[employeeIdField];
+            if (empId){
+                if (!tasksByEmpId[empId]){
+                    tasksByEmpId[empId] = [];
+                }
+                tasksByEmpId[empId].push(r);
+            }
+        });
+
+        Ext.Object.each(tasksByEmpId, function(empId, tasks){
+            if (empId && tasks && tasks.length > 0){
+                var owner = tasks[0].get('Owner'),
+                    mgrID =owner && owner[managerIDField];
+
+                var userObj = this.getUserItem(empId);
+                userObj.setUserData(owner);
+
+                userObj.addTasks(tasks);
+                if (mgrID && mgrID.length > 0){
+                    var mgrObj = this.getUserItem(mgrID);
+                    mgrObj.addChild(userObj);
+                }
+            }
+        }, this);
+
+        var snapsByOwner = {},
+            userOids = [];
+        Ext.Array.each(snapshots, function(s){
+            var objectID = s.get('Owner').toString();
+            if (!snapsByOwner[objectID]){
+                snapsByOwner[objectID] = [];
+                userOids.push(objectID.toString());
+            }
+            snapsByOwner[objectID].push(s);
+
+        });
+
+        var usersByObjectID = {};
+        Ext.Object.each(this.userTree, function(empId, user){
+            var userObjectId = user.objectID && user.objectID.toString() || 0;
+            if (Ext.Array.contains(userOids, userObjectId)){
+                usersByObjectID[userObjectId] = user;
+            }
+        });
+        this.logger.log('usersByObjectID', usersByObjectID, snapsByOwner);
+        Ext.Object.each(snapsByOwner, function(objectId, snaps){
+            var userObject = usersByObjectID[objectId.toString()];
+            if (userObject){
+                userObject.addTasks(snaps, true);
+            }
+        });
+        this.logger.log('processTasks after 2',this.userTree, this.getUserItem("316380").getChildren().length);
+        this.getUserItem(managerId).doCalculations();
+        this.getUserItem(managerId).doHistoricalCalculations();
+        this.logger.log('processTasks after 3',this.userTree, this.getUserItem("316380").getChildren().length);
+        this.logger.log('processTasks manager', this.getUserItem(managerId));
+    }
+});
+
+
+Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
+    extend: "Ext.data.TreeModel",
+
+    fields: [{
+        name: 'employeeId',
+        displayName: 'Employee ID',
+        defaultValue: null
+    },{
+        name: "displayName",
+        displayName: "Owner"
+    },{
+        name: "numDefined"
+    },{
+        name: "numInProgress"
+    },{
+        name: "numCompleted"
+    },{
+        name: "ToDo"
+    },{
+        name: 'pctCompleteCount'
+    },{
+        name: 'pctCompleteEffort'
+    },{
+        name: 'deltaToDo'
+    },{
+        name: 'taskIds'
+    }]
+});
+
+Ext.define("manager-task-report", {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+
+    config: {
+        defaultSettings: {
+            employeeIDField: 'c_EmployeeId',
+            managerEmployeeIDField: 'c_ManagerEmployeeId',
+            costCenterField: 'CostCenter',
+            costCenter: null,
+            isManagerField: 'c_IsManager',
+            showHistoricalData: true,
+            daysBack: 7
+        }
+    },
+
+    items: [
+        {xtype:'container',itemId:'manager_box',layout:'hbox'},
+        {xtype:'container',itemId:'display_box'},
+        {xtype:'container',itemId:'detail_box'}
+    ],
+
+    integrationHeaders : {
+        name : "manager-task-report"
+    },
+                        
+    launch: function() {
+        this.logger.log('launch')
+        this.userManagerStore = Ext.create('CArABU.technicalservices.UserManagerStore',{
+            employeeIDField: this.getEmployeeIDField(),
+            managerEmployeeIDField: this.getManagerEmployeeIDField(),
+            costCenterField: this.getCostCenterField(),
+            costCenter: this.getCostCenter(),
+            context: this.getContext(),
+            isManagerField: this.getIsManagerField()
+        });
+        this.userManagerStore.on('ready', this._initializeApp, this);
+        this.userManagerStore.on('configurationerror', this._showConfigurationError, this);
+    },
+    _showConfigurationError: function(msg){
+        this.down('#display_box').removeAll();
+        this.down('#detail_box').removeAll();
+        this.down('#display_box').add({
+            xtype: 'container',
+            html: msg,
+            cls: "configuration-error"
+        });
+    },
+    showHistoricalData: function(){
+        return this.getSetting('showHistoricalData') === "true" || this.getSetting('showHistoricalData') === true;
+    },
+    getHistoricalDate: function(){
+        var daysBack = this.getSetting('daysBack') || 7,
+            backDate =Rally.util.DateTime.toIsoString(Rally.util.DateTime.add(new Date(),'day',-daysBack));
+        this.logger.log('getHistoricalDate', backDate);
+        return backDate;
+    },
+    getIsManagerField: function(){
+        return this.getSetting('isManagerField');
+    },
+    getEmployeeIDField: function(){
+        return this.getSetting('employeeIDField');
+    },
+    getManagerEmployeeIDField: function(){
+        return this.getSetting('managerEmployeeIDField');
+    },
+    getCostCenterField: function(){
+        return this.getSetting('costCenterField');
+    },
+    getCostCenter: function(){
+        return this.getSetting('costCenter');
+    },
+    getTaskFetchList: function(){
+        return ['ObjectID','FormattedID','Name','ToDo','Estimate','State','Owner','Milestones','WorkProduct',this.getEmployeeIDField(),this.getManagerEmployeeIDField()];
+    },
+    _getAllManagerFilters: function(){
+        return [{
+            property: this.getEmployeeIDField(),
+            operator: "!=",
+            value: ""
+        },{
+            property: this.getIsManagerField(),
+            value: 'Y'
+        }];
+    },
+    _getUserFetch: function(){
+        return ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.getEmployeeIDField(), this.getManagerEmployeeIDField(), this.getIsManagerField()]);
+    },
+    _updateManagers: function(store, records, success){
+        this.logger.log('_updateManagers', store, records);
+        this.managerRecords = null;
+        if (success){
+            this.managerRecords = records;
+        } else {
+            Rally.ui.notify.Notifier.showError({message: 'Error loading managers.'});
+        }
+    },
+    _addIterationFilter: function(){
+        this.down('#manager_box').add({
+            xtype: 'rallyiterationcombobox',
+            fieldLabel: 'Iteration',
+            labelAlign: 'right'
+        });
+    },
+    _addManagerFilters: function(){
+        var employeeIDField = this.getEmployeeIDField();
+
+        this.down('#manager_box').add({
+            xtype: 'rallyusercombobox',
+            fieldLabel: 'Manager',
+            labelAlign: 'right',
+            allowNoEntry: true,
+            value: null,
+            width: 300,
+            remoteFilter: false,
+            storeConfig: {
+                filters: this._getAllManagerFilters(),
+                fetch: this._getUserFetch(),
+                limit: 'Infinity',
+                autoLoad: true,
+                listeners: {
+                    scope: this,
+                    load: this._updateManagers,
+                    single: true
+                }
+            },
+            valueField: employeeIDField,
+            displayField: "DisplayName"
+
+        });
+    },
+    _clearApp: function(){
+        this.down('#display_box').removeAll();
+        this.down('#detail_box').removeAll();
+    },
+    _initializeApp: function(){
+        this.logger.log('_initializeApp');
+        this._clearApp();
+        this.down('#manager_box').removeAll();
+
+
+        this._addIterationFilter();
+        this._addManagerFilters();
+
+        var btn = this.down('#manager_box').add({
+            xtype: 'rallybutton',
+            text: 'Update'
+        });
+        btn.on('click', this._fetchTasks, this);
+
+    },
+    getSelectedManagerId: function(){
+        return this.down('rallyusercombobox') && this.down('rallyusercombobox').getValue() || null;
+    },
+    getSelectedIterationFilter: function(){
+        var iterationRecord = this.down('rallyiterationcombobox') && this.down('rallyiterationcombobox').getRecord();
+        if (iterationRecord){
+            return Rally.data.wsapi.Filter.and([{
+                property: 'WorkProduct.Iteration.Name',
+                value: iterationRecord.get('Name')
+            },{
+                property: 'WorkProduct.Iteration.StartDate',
+                value: iterationRecord.get('StartDate')
+            },{
+                property: 'WorkProduct.Iteration.EndDate',
+                value: iterationRecord.get('EndDate')
+            }]);
+        }
+        return null;
+    },
+    getManagerRecords: function(){
+       return this.managerRecords;
+    },
+    _getWsapiTaskFilters: function(empId, includeEmployeeTasks){
+        if (!this.managerTree){
+            this.managerTree = this.userManagerStore.buildManagerTree(null,this.getManagerRecords());
+        }
+
+        var managerIds = this.managerTree.getAllChildrenEmployeeIds(empId),
+            managerIDField = this.getManagerEmployeeIDField(),
+            filters = _.map(managerIds, function(id){
+                return {
+                    property: 'Owner.' + managerIDField,
+                    value: id
+                };
+            });
+
+        this.logger.log('_getWsapiTaskFilters managerIds', managerIds);
+        if (includeEmployeeTasks){
+            filters.push({
+                property: 'Owner.' + this.getEmployeeIDField(),
+                value: empId
+            });
+        }
+
+        filters = Rally.data.wsapi.Filter.or(filters);
+        var iterationFilter = this.getSelectedIterationFilter();
+        if (iterationFilter){
+            this.logger.log('iterationFilter', iterationFilter.toString());
+            filters = filters.and(iterationFilter);
+
+        }
+        this.logger.log('_getWsapiTaskFilters',filters.toString());
+        return filters;
+    },
+    _fetchTasks: function(){
+        var managerId = this.getSelectedManagerId();
+        this._clearApp();
+        this.logger.log('_fetchTasks', this.getSelectedManagerId());
+
+        if (!managerId){
+            Rally.ui.notify.Notifier.showWarning({message: "Please select a manager."});
+            return;
+        }
+        this.setLoading("Loading tasks...");
+
+        this.userTree = this.userManagerStore.buildManagerTree(managerId, this.getManagerRecords());
+        var filters = this._getWsapiTaskFilters(managerId, false);
+
+        Ext.create('Rally.data.wsapi.Store',{
+            model: 'Task',
+            filters: filters,
+            fetch: this.getTaskFetchList(),
+            limit: 'Infinity',
+            pageSize: 1000
+        }).load({
+            callback: this._createSummaryGrid,
+            scope: this
+        });
+
+    },
+    _createSummaryGrid: function(records, operation){
+        this.logger.log('_createSummaryGrid', records, operation);
+
+        this.down('#display_box').removeAll();
+        this.down('#detail_box').removeAll();
+
+        if (!operation.wasSuccessful()){
+            Rally.ui.notify.Notifier.showError({ message: "Error fetching Tasks:  " + operation.error.errors.join(',') });
+            this.setLoading(false);
+            return;
+        }
+
+        this._fetchHistoricalSummaryTasks(records).then({
+            success: function(snapshots){
+                this.setLoading(false);
+                var userItem = this.userTree.getUserItem("320785");
+                this.logger.log('userItem 1', userItem.getChildren().length, userItem.kids && userItem.kids.length);
+
+                var summaryStore = this._buildSummaryStore(records, snapshots);
+
+                this.logger.log('_createSummaryGrid', summaryStore);
+                this.down('#display_box').add({
+                    xtype: 'treepanel',
+                    itemId: 'summary-grid',
+                    cls: 'rally-grid',
+                    padding: 25,
+                    selModel: Ext.create("Ext.selection.RowModel",{
+                        listeners: {
+                            select: this._showDetails,
+                            scope: this
+                        }
+                    }),
+                    store: summaryStore,
+                    rootVisible: false,
+                    columns: this._getSummaryStoreColumnCfgs()
+                });
+            },
+            scope: this
+        });
+    },
+    _fetchHistoricalSummaryTasks: function(currentTaskRecords){
+        var deferred = Ext.create('Deft.Deferred'),
+            maxObjectIds = 25;
+
+        if (!this.showHistoricalData()){
+            deferred.resolve([]);
+        }
+
+        var tasks = Ext.Array.map(currentTaskRecords, function(r){
+            return r.get('ObjectID');
+        });
+        this.logger.log('_fetchHistoricalSummaryTasks users', tasks);
+
+        var promises = [];
+        for (var i= 0, j=tasks.length; i<j; i+=maxObjectIds){
+            var tempArray = tasks.slice(i,i+maxObjectIds);
+            promises.push(this._fetchLookbackData({
+                fetch: ['ObjectID','_ItemHierarchy','ToDo','Estimate','State','Owner'],
+                find: {
+                    ObjectID: {$in: tempArray},
+                    __At: this.getHistoricalDate()
+                },
+                limit: 'Infinity'
+            }));
+        }
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                this.historicalRecords = _.flatten(results);
+                deferred.resolve(_.flatten(results));
+            },
+            failure: function(msg){
+                Rally.ui.notify.Notifier.showError({ message: "Error loading historical task summary data:  " + msg });
+                deferred.resolve([]);
+            },
+            scope: this
+        });
+
+        return deferred;
+    },
+    _fetchLookbackData: function(config){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.lookback.SnapshotStore',config).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    var msg = operation && operation.error && operation.error.errors.join(',') || "No Response provided - The connection may have been closed because the request was too big or timed out." ;
+                    deferred.reject(msg);
+                }
+            }
+        });
+
+        return deferred;
+    },
+    _showDetails: function(store, record, index){
+
+        this.logger.log('_rowSelected',record, index);
+
+        this.down('#detail_box').removeAll();
+
+        var defaultShowGrid = this.showGridState || true;
+
+        this.down('#detail_box').add({
+            xtype: 'container',
+            layout:'hbox',
+            padding: 0,
+            items: [{
+                xtype: 'rallybutton',
+                iconCls: 'icon-graph',
+                cls: 'secondary rly-small',
+                pressedCls: 'primary rly-small',
+                toggleGroup: 'detailView',
+                enableToggle: true,
+                pressed: !defaultShowGrid,
+                scope: this,
+                listeners: {
+                    toggle: function(btn, state){
+                        this._toggleDetail(btn,state,record);
+                    },
+                    scope: this
+                }
+            },{
+                xtype: 'rallybutton',
+                itemId: 'btn-grid',
+                iconCls: 'icon-grid',
+                cls: 'secondary rly-small',
+                pressedCls: 'primary rly-small',
+                toggleGroup: 'detailView',
+                enableToggle: true,
+                scope: this,
+                pressed: defaultShowGrid,
+                listeners: {
+                    toggle: function(btn, state){
+                        this._toggleDetail(btn,state,record);
+                    },
+                    render: function(btn){
+                        this._toggleDetail(btn, defaultShowGrid, record);
+                    },
+                    scope: this
+                }
+            }]
+        });
+
+
+
+    },
+    _toggleDetail: function(btn, state, record){
+        var showGrid = true;
+        if ((btn.iconCls === 'icon-graph' && state === true) || (btn.iconCls === 'icon-grid' && state===false)){
+            showGrid = false;
+        }
+        this.showGridState = showGrid;
+        this.logger.log('_toggleDetail', btn.iconCls, state, showGrid, record);
+
+        if (state){
+            btn.removeCls('secondary');
+            btn.addCls('primary');
+        } else {
+            btn.removeCls('primary');
+            btn.addCls('secondary');
+        }
+
+        this.down('rallygridboard')  && this.down('rallygridboard').destroy();
+        this.down('rallychart') && this.down('rallychart').destroy();
+
+        if (showGrid){
+            this._addDetailGrid(record);
+        } else {
+            this._addDetailChart(record);
+        }
+
+    },
+    _addDetailChart: function(user){
+        var objectIDFilters = user.get('taskIds') || [];
+
+        if (objectIDFilters.length ===0){
+            objectIDFilters.push(0);
+        }
+
+        this.down('#detail_box').add({
+            xtype: 'rallychart',
+            loadMask: false,
+            storeType: 'Rally.data.lookback.SnapshotStore',
+            storeConfig: {
+                find: {
+                    _TypeHierarchy: 'Task',
+                    ObjectID: {$in: objectIDFilters}
+                },
+                fetch: ['ToDo', 'Estimate','State','_ValidTo','_ValidFrom'],
+                hydrate: ['State'],
+                removeUnauthorizedSnapshots: true
+            },
+
+            calculatorType: 'CArABU.technicalservices.BurndownCalculator',
+            calculatorConfig: {},
+            chartConfig: {
+                chart: {
+                    defaultSeriesType: 'area',
+                    zoomType: 'xy'
+                },
+                title: {
+                    text: 'Task Burndown'
+                },
+                xAxis: {
+                    categories: [],
+                    tickmarkPlacement: 'on',
+                    tickInterval: 5,
+                    title: {
+                        text: 'Date',
+                        margin: 10
+                    }
+                },
+                yAxis: [
+                    {
+                        title: {
+                            text: 'Hours'
+                        }
+                    }
+                ],
+                tooltip: {
+                    formatter: function() {
+                        return '' + this.x + '<br />' + this.series.name + ': ' + this.y;
+                    }
+                },
+                plotOptions: {
+                    series: {
+                        marker: {
+                            enabled: false,
+                            states: {
+                                hover: {
+                                    enabled: true
+                                }
+                            }
+                        },
+                        groupPadding: 0.01
+                    },
+                    column: {
+                        stacking: null,
+                        shadow: false
+                    }
+                }
+            }
+        });
+
+    },
+    _addDetailGrid: function(user){
+
+        var employeeId = user.get('employeeId'),
+            filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
+
+        this.logger.log('_addDetailGrid filters', filters.toString());
+                Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
+                    models: ['task'],
+                    autoLoad: false,
+                    enableHierarchy: true,
+                    fetch: this.getTaskFetchList(),
+                    filters: filters
+                }).then({
+                    success: function(store) {
+//                        store.model.addField('WorkProductRecord');
+                        store.on('load', this._loadWorkProducts, this);
+
+                        this.down('#detail_box').add({
+                            xtype: 'rallygridboard',
+                            context: this.getContext(),
+                            modelNames: ['task'],
+                            stateful: false,
+                            stateId: "grid-100",
+                            itemId: 'detail-grid',
+                            toggleState: 'grid',
+                            plugins: [{
+                                ptype: 'rallygridboardfieldpicker',
+                                headerPosition: 'left',
+                                modelNames: ['task'],
+                                stateful: true,
+                                stateId: this.getContext().getScopedStateId('detail-columns-100')
+                            },{
+                                ptype: 'rallygridboardinlinefiltercontrol',
+                                inlineFilterButtonConfig: {
+                                    stateful: true,
+                                    stateId: this.getContext().getScopedStateId('detail-filters'),
+                                    modelNames: ['task'],
+                                    inlineFilterPanelConfig: {
+                                        quickFilterPanelConfig: {
+                                            defaultFields: [
+                                                'ArtifactSearch',
+                                                'Owner',
+                                                'State'
+                                            ]
+                                        }
+                                    }
+                                }
+                            },{
+                                ptype: 'rallygridboardactionsmenu',
+                                menuItems: [
+                                    {
+                                        text: 'Export...',
+                                        handler: function() {
+                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                                                this.down('rallygridboard').getGridOrBoard());
+                                        },
+                                        scope: this
+                                    }
+                                ],
+                                buttonConfig: {
+                                    iconCls: 'icon-export'
+                                }
+                            }],
+                            cardBoardConfig: {
+                                attribute: 'State'
+                            },
+                            gridConfig: {
+                                store: store,
+                                storeConfig: {
+                                    filters: filters
+                                },
+                                rankColumnDataIndex: 'TaskIndex',
+                                remoteSort: true,
+                                enableRanking: false,
+                                columnCfgs: this._getDetailColumnCfgs(),
+                                derivedColumns: this._getDefaultColumns()
+                            },
+                            height: 400
+                        });
+                    },
+                    scope: this
+                });
+    },
+    _loadWorkProducts: function(store, node, records, success){
+        this.logger.log('_loadWorkProducts', records, success);
+        var objectIds = _.map(records, function(r){
+            return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0
+        });
+        objectIds = _.uniq(objectIds);
+        objectIds = Ext.Array.map(objectIds, function(o){
+            return {
+                property: 'ObjectID',
+                value: o
+            }
+        });
+
+
+        Ext.create('Rally.data.wsapi.artifact.Store',{
+            models: ['UserStory','Defect'],
+            fetch: ['ObjectID','Predecessors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
+            filters: Rally.data.wsapi.Filter.or(objectIds),
+            limit: 'Infinity'
+        }).load({
+            callback: function(artifacts, operation){
+                this.logger.log('ArtifactsLoaded', artifacts, operation);
+                var artifactHash = {};
+                Ext.Array.each(artifacts, function(a){
+                    artifactHash[a.get('ObjectID')] = a.getData();
+                });
+                Ext.Array.each(records, function(r){
+                    r.set('WorkProduct', artifactHash[r.get('WorkProduct').ObjectID]);
+                });
+            },
+            scope: this
+        });
+    },
+    _getDefaultColumns: function(){
+        var columns = [{
+            text: '% Completed',
+            xtype: 'pctcompletetemplatecolumn'
+        },{
+            text: 'Work Product Dependencies',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Predecessors'
+        },{
+            text: 'Work Product Milestones',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Milestones'
+        },{
+            text: 'Work Product Feature',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Feature'
+        },{
+            text: 'Work Product Initiative',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Initiative'
+        }];
+        if (this.showHistoricalData()){
+            columns = columns.concat([{
+                text: 'Historical State',
+                xtype: 'historicalstatetemplate',
+                historyField: 'State',
+                historicalRecords: this.historicalRecords,
+                width: 70,
+                align: 'center'
+            },{
+                text: 'Delta ToDo',
+                xtype: 'historicaldeltatemplate',
+                deltaField: 'ToDo',
+                historicalRecords: this.historicalRecords,
+                width: 60,
+                align: 'center'}]);
+        }
+        return columns;
+
+        //    text: 'Story Dependencies',
+        //    xtype: 'workproductdependencytemplatecolumn'
+        //},{
+        //    text: 'Story Feature',
+        //    xtype: 'workproductfeaturetemplatecolumn'
+        //},{
+        //    text: 'Story Initiative',
+        //    xtype: 'workproductinitiativetemplatecolumn'
+        //},{
+        //    text: 'Story Milestones',
+        //    xtype: 'workproductmilestonestemplatecolumn'
+    },
+    _getDetailColumnCfgs: function(){
+       var columns = [{
+            dataIndex: 'FormattedID'
+        },{
+            dataIndex: 'Name',
+            text: 'Name',
+            flex: 1
+        },{
+            dataIndex: 'ToDo',
+            text: 'Todo'
+        },{
+            dataIndex: 'State'
+        }];
+
+        return columns.concat(this._getDefaultColumns());
+    },
+    _getSummaryStoreColumnCfgs: function(){
+        var columns = [
+            {
+                xtype: 'treecolumn',
+                text: 'Owner',
+                menuDisabled: true,
+                dataIndex: 'displayName',
+                flex: 1
+            },{
+                text:'Defined',
+                menuDisabled: true,
+                dataIndex:'numDefined'
+            },{
+                text:'In Progress',
+                menuDisabled: true,
+                dataIndex:'numInProgress'
+            },{
+                text:'Completed',
+                menuDisabled: true,
+                dataIndex:'numCompleted'
+            },{
+                text: 'Total ToDo',
+                menuDisabled: true,
+                dataIndex: 'ToDo'
+            },{
+                text: '%Complete (Count)',
+                dataIndex: 'pctCompleteCount',
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteCount',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
+            },{
+                text: '%Complete (Effort)',
+                dataIndex: 'pctCompleteEffort',
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    return Ext.create('Rally.ui.renderer.template.progressbar.ProgressBarTemplate',{
+                        percentDoneName: 'pctCompleteEffort',
+                        calculateColorFn: function(){
+                            return Rally.util.Colors.lime; //'#8DC63F';
+                        }
+                    }).apply(item.getData());
+                }
+
+            }
+        ];
+
+        if (this.showHistoricalData()){
+            columns.push({
+                text: 'Delta ToDo',
+                dataIndex: 'deltaToDo',
+                menuDisabled: true,
+                renderer: function(value,meta_data,item) {
+                    if (value < 0){
+                        return '<div class="icon-down"></div>' + Math.abs(value);
+                    }
+                    if (value > 0){
+                        return '<div class="icon-up"></div>' + value;
+                    }
+                    return '<div class="icon-none"></div>';
+                }
+            });
+        }
+        return columns;
+    },
+    percentRenderer: function(val){
+        if (val && Number(val)){
+            return (Number(val) * 100).toFixed(1) + "%";
+        }
+        return "";
+    },
+    _buildSummaryStore: function(records, snapshots){
+
+        //now we need to ask the task records to the store
+        this.userTree.processTasks(records,snapshots, this.getSelectedManagerId());
+
+        var root = this.userTree.getUserItem(this.getSelectedManagerId());
+
+        this.logger.log('_buildSummaryStore', root);
+
+        return Ext.create('Ext.data.TreeStore', {
+            root: { children: root.children,
+                    expanded: false
+            },
+            model: CArABU.technicalservices.UserSummaryTaskModel
+        });
+    },
+    getSettingsFields: function(){
+        return CArABU.technicalservices.ManagerTaskReport.Settings.getFields();
+    },
+    getOptions: function() {
+        return [
+            {
+                text: 'About...',
+                handler: this._launchInfo,
+                scope: this
+            }
+        ];
+    },
+    
+    _launchInfo: function() {
+        if ( this.about_dialog ) { this.about_dialog.destroy(); }
+        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
+    },
+    
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        // Ext.apply(this, settings);
+        this.launch();
+    }
+});
+
+            
+               Rally.launchApp('manager-task-report', {
+                   name: 'Manager Task Report'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+.configuration-error {
+    color: red;
+}
+
+.historical-state {
+    background-color: #888!important;
+    border-radius: 2px;
+    height: 16px!important;
+    width: 18px!important;
+}
+
+.historical-before-state {
+    background-color: #d6d6d6!important;
+}
+.historical-schedule-state {
+    background-color: white;
+    color: white;
+    float: left;
+    font-family: NotoSansBold,Helvetica,Arial;
+    font-size: 12px;
+    height: 14px;
+    max-width: 18px;
+    text-align: center;
+}
+.history {
+    color: #A9A9A9!important;
+    padding: 5px;
+}
+    </style>
+
+</head>
+<body></body>
+</html>
