@@ -101,7 +101,8 @@ Ext.define("manager-task-report", {
         this.down('#manager_box').add({
             xtype: 'rallyiterationcombobox',
             fieldLabel: 'Iteration',
-            labelAlign: 'right'
+            labelAlign: 'right',
+            margin: 10
         });
     },
     _addManagerFilters: function(){
@@ -113,6 +114,7 @@ Ext.define("manager-task-report", {
             labelAlign: 'right',
             allowNoEntry: true,
             value: null,
+            margin: 10,
             width: 300,
             remoteFilter: false,
             storeConfig: {
@@ -143,13 +145,24 @@ Ext.define("manager-task-report", {
 
         this._addIterationFilter();
         this._addManagerFilters();
+        this._addMilestonePicker();
 
         var btn = this.down('#manager_box').add({
             xtype: 'rallybutton',
-            text: 'Update'
+            text: 'Update',
+            margin: 10
         });
         btn.on('click', this._fetchTasks, this);
 
+    },
+    _addMilestonePicker: function(){
+        this.down('#manager_box').add({
+            fieldLabel: 'Milestone(s)',
+            labelAlign: 'right',
+            width: 300,
+            margin: 10,
+            xtype: 'rallymilestonepicker'
+        });
     },
     getSelectedManagerId: function(){
         return this.down('rallyusercombobox') && this.down('rallyusercombobox').getValue() || null;
@@ -169,6 +182,22 @@ Ext.define("manager-task-report", {
             }]);
         }
         return null;
+    },
+    getSelectedMilestones: function(){
+        var milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
+        this.logger.log('getSelectedMilestones', milestones);
+        if (milestones && milestones.length > 0){
+            var milestoneFilter = Ext.Array.map(milestones, function(m){
+                return {
+                    property: "WorkProduct.Milestones",
+                    value: m.get('_ref')
+                };
+            });
+            return Rally.data.wsapi.Filter.or(milestoneFilter);
+        }
+        return null;
+
+
     },
     getManagerRecords: function(){
        return this.managerRecords;
@@ -202,6 +231,12 @@ Ext.define("manager-task-report", {
             filters = filters.and(iterationFilter);
 
         }
+
+        var milestoneFilter = this.getSelectedMilestones();
+        if (milestoneFilter){
+            filters = filters.and(milestoneFilter);
+        }
+
         this.logger.log('_getWsapiTaskFilters',filters.toString());
         return filters;
     },
@@ -481,7 +516,7 @@ Ext.define("manager-task-report", {
 
         var employeeId = user.get('employeeId'),
             filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
-
+        this.setLoading("Loading Task Details...");
         this.logger.log('_addDetailGrid filters', filters.toString());
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
@@ -524,21 +559,21 @@ Ext.define("manager-task-report", {
                                         }
                                     }
                                 }
-                            },{
-                                ptype: 'rallygridboardactionsmenu',
-                                menuItems: [
-                                    {
-                                        text: 'Export...',
-                                        handler: function() {
-                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
-                                                this.down('rallygridboard').getGridOrBoard());
-                                        },
-                                        scope: this
-                                    }
-                                ],
-                                buttonConfig: {
-                                    iconCls: 'icon-export'
-                                }
+                            //},{
+                            //    ptype: 'rallygridboardactionsmenu',
+                            //    menuItems: [
+                            //        {
+                            //            text: 'Export...',
+                            //            handler: function() {
+                            //                window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                            //                    this.down('rallygridboard').getGridOrBoard());
+                            //            },
+                            //            scope: this
+                            //        }
+                            //    ],
+                            //    buttonConfig: {
+                            //        iconCls: 'icon-export'
+                            //    }
                             }],
                             cardBoardConfig: {
                                 attribute: 'State'
@@ -561,8 +596,10 @@ Ext.define("manager-task-report", {
                 });
     },
     _loadWorkProducts: function(store, node, records, success){
+        this.setLoading("Loading Work Product data...");
         this.logger.log('_loadWorkProducts', records, success);
-        var objectIds = _.map(records, function(r){
+        var maxObjectIds = 25,
+            objectIds = _.map(records, function(r){
             return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0
         });
         objectIds = _.uniq(objectIds);
@@ -574,24 +611,55 @@ Ext.define("manager-task-report", {
         });
 
 
-        Ext.create('Rally.data.wsapi.artifact.Store',{
-            models: ['UserStory','Defect'],
-            fetch: ['ObjectID','Predecessors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
-            filters: Rally.data.wsapi.Filter.or(objectIds),
-            limit: 'Infinity'
-        }).load({
-            callback: function(artifacts, operation){
-                this.logger.log('ArtifactsLoaded', artifacts, operation);
-                var artifactHash = {};
+        var promises = [];
+        for (var i= 0, j=objectIds.length; i<j; i+=maxObjectIds){
+            var tempArray = objectIds.slice(i,i+maxObjectIds);
+            promises.push(this._fetchWsapiArtifactData({
+                models: ['UserStory','Defect'],
+                //model: 'UserStory',
+                compact: false,
+                fetch: ['ObjectID','Predecessors','Successors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
+                filters: Rally.data.wsapi.Filter.or(tempArray),
+                limit: 'Infinity'
+            }));
+        }
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                var artifactHash = {},
+                    artifacts = _.flatten(results);
+
                 Ext.Array.each(artifacts, function(a){
                     artifactHash[a.get('ObjectID')] = a.getData();
                 });
                 Ext.Array.each(records, function(r){
                     r.set('WorkProduct', artifactHash[r.get('WorkProduct').ObjectID]);
                 });
+                this.setLoading(false);
+
+            },
+            failure: function(msg){
+                this.setLoading(false);
+                Rally.ui.notify.Notifier.showError({ message: msg });
+
             },
             scope: this
         });
+
+    },
+    _fetchWsapiArtifactData: function(config){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.artifact.Store', config).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    deferred.reject("Error fetching work product data: " + operation.error && operation.error.errors && operation.error.errors.join(','));
+                }
+            }
+        });
+
+        return deferred;
     },
     _getDefaultColumns: function(){
         var columns = [{
@@ -600,7 +668,7 @@ Ext.define("manager-task-report", {
         },{
             text: 'Work Product Dependencies',
             xtype: 'workproducttemplatecolumn',
-            workProductField: 'Predecessors'
+            workProductField: 'PredecessorsAndSuccessors'
         },{
             text: 'Work Product Milestones',
             xtype: 'workproducttemplatecolumn',
@@ -632,17 +700,6 @@ Ext.define("manager-task-report", {
         }
         return columns;
 
-        //    text: 'Story Dependencies',
-        //    xtype: 'workproductdependencytemplatecolumn'
-        //},{
-        //    text: 'Story Feature',
-        //    xtype: 'workproductfeaturetemplatecolumn'
-        //},{
-        //    text: 'Story Initiative',
-        //    xtype: 'workproductinitiativetemplatecolumn'
-        //},{
-        //    text: 'Story Milestones',
-        //    xtype: 'workproductmilestonestemplatecolumn'
     },
     _getDetailColumnCfgs: function(){
        var columns = [{
@@ -724,7 +781,7 @@ Ext.define("manager-task-report", {
                     if (value > 0){
                         return '<div class="icon-up"></div>' + value;
                     }
-                    return '<div class="icon-none"></div>';
+                    return 'No Change';
                 }
             });
         }

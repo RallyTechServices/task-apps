@@ -44,3 +44,18 @@
     color: #A9A9A9!important;
     padding: 5px;
 }
+.dependency-link{
+    cursor: pointer;
+    color: #337ec6;
+}
+[notification]:before{
+    position: absolute;
+    content: attr(notification);
+    opacity: 0;
+}
+[notification]:hover:before{
+    opacity: 1;
+}
+[notification]:not([notification-persistent]):before {
+    pointer-events: none;
+}
