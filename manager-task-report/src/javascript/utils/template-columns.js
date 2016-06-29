@@ -19,7 +19,6 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
      *      function(){ return false; }
      */
     showDangerNotificationFn: function(values) {
-        console.log('showDangerNotificationFn',values);
         if (!values["Estimate"]){
             return true;
         }
@@ -50,7 +49,6 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
      * Defaults to a function that returns the percentage complete.
      */
     generateLabelTextFn: function (recordData) {
-        console.log('generateLabelTextFn',recordData);
         return this.calculatePercent(recordData) + '%';
     },
 
@@ -99,13 +97,19 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
         calculateWidth: function (recordData) {
             var percentDone = this.calculatePercent(recordData);
             return percentDone > 100 ? '100%' : percentDone + '%';
+        },
+        getDangerTooltip: function(recordData){
+            if (!recordData["Estimate"]){
+                return "No Estimate on Task.";
+            }
+            return "";
         }
     },
 
     constructor: function(config) {
         var templateConfig = config && config.template || [
                 '<tpl>',
-                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div data-qtip="{[this.getDangerTooltip(values)]}" class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
                 '<div class="rly-progress-bar" style="background-color: {[this.calculateColorFn(values)]}; width: {[this.calculateWidth(values)]}; "></div>',
                 '<tpl if="this.showDangerNotificationFn(values)">',
                 '<div class="progress-bar-danger-notification"></div>',
@@ -132,7 +136,7 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-
+        Ext.QuickTips.init();
         me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
             denominatorField: me.denominatorField,
             numeratorField: me.numeratorField
@@ -161,7 +165,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-        console.log('this', this);
 
         me.tpl = Ext.create('Ext.XTemplate',
             '<div aria-label="Edit Schedule State: {ScheduleState}" class="schedule-state-wrapper " style="width: 100%">',
@@ -173,7 +176,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
                     var snap = Ext.Array.filter(this.historicalRecords, function(r){
                         return r.get('ObjectID') === values['ObjectID'];
                     });
-                    console.log('getHistoricalField', values, snap)
                     if (snap && snap.length > 0){
                         return snap[0].get(this.historyField) || "";
                     }
@@ -217,10 +219,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
                         }
                     }, this);
 
-                    //if(this.showTrigger){
-                    //    returnVal.push('<div class="editor-trigger icon-chevron-down"></div>');
-                    //}
-                    console.log('renderStates', returnVal);
                     return returnVal.join('');
                 },
                 _getSymbolState: function(recordData, state) {
@@ -250,7 +248,6 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-        console.log('this', this);
 
         me.tpl = Ext.create('Ext.XTemplate',
             '<div class="{[this.getDeltaDirection(values)]}"></div><span style="color:#A9A9A9">{[this.getDelta(values)]}</span>',{
@@ -261,7 +258,7 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
                         currentValue = values[field] || 0;
 
                     if (currentValue === historicalValue){
-                        return "icon-none history";
+                        return "history";
                     }
                     return currentValue > historicalValue ? "icon-up history" : "icon-down history";
                 },
@@ -271,7 +268,7 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
                         currentValue = values[field] || 0;
 
                     if (currentValue === historicalValue){
-                        return "";
+                        return "No Change";
                     }
                     return Math.abs(currentValue - historicalValue);
                 },
@@ -308,8 +305,8 @@ Ext.define('CArABU.technicalservices.WorkProductTemplateColumn',{
         if (field === 'Milestones'){
             return Ext.create('Rally.ui.renderer.template.PillTemplate', { collectionName: 'Milestones', iconCls: 'icon-milestone', cls: 'milestone-pill'});
         }
-        if (field === "Predecessors"){
-            return Ext.create('Rally.ui.renderer.template.status.PredecessorsAndSuccessorsStatusTemplate');
+        if (field === "PredecessorsAndSuccessors"){
+            return Ext.create('CArABU.technicalservices.PredecessorsAndSuccessorsStatusTemplate');
         }
 
         if (field === "Feature"){
@@ -340,27 +337,3 @@ Ext.define('CArABU.technicalservices.WorkProductTemplateColumn',{
     }
 });
 
-Ext.define('CArABU.technicalservices.InitiativeTemplate',{
-    extend: 'Ext.XTemplate',
-
-    constructor: function(config) {
-        var templateConfig = [
-            '<tpl if="this.getParent(values)">{[this.createDetailUrl(values)]}</tpl>',
-            {
-                getParent:function (recordData) {
-                    return recordData && recordData.Feature && recordData.Feature.Parent
-                },
-                createDetailUrl:function (recordData) {
-                    var parent = this.getParent(recordData);
-                    return Rally.util.DetailLink.getLink({
-                            record: parent,
-                            showHover: !!this.showHover,
-                            text: parent.FormattedID
-                        }) + ': ' + parent._refObjectName;
-                }
-            }
-        ];
-
-        return this.callParent(templateConfig);
-    }
-});

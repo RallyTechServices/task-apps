@@ -30,7 +30,6 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
         this.leaf = false;
     },
     getChildren: function(){
-        console.log('getChildren', this.displayName, this.timestamp, Ext.clone(this.children), this.children);
         if (!this.children){
             this.children = [];
         }
@@ -136,7 +135,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                     mgrObj.addChild(userObj);
                 }
             }
-            console.log('users', this.userTree, empId, this.employeeIDField);
+
         }, this);
 
         //Todo clean out all users other than root.
@@ -158,7 +157,6 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 this.userTree = {};
             }
             employeeId = employeeId.toString();
-            console.log('getUserItem', employeeId,this.userTree[employeeId] && this.userTree[employeeId].displayName, this.userTree[employeeId] && this.userTree[employeeId].getChildren().length );
             if (!this.userTree[employeeId]){
                 this.userTree[employeeId] = Ext.create('CArABU.technicalservices.UserTreeItem',{
                     employeeId: employeeId

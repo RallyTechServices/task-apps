@@ -16,8 +16,24 @@ Ext.override(Rally.ui.grid.TreeGrid, {
     _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
         return _(this.headerCt.items.getRange()).map(function(column) {
             //override:  Added additional search for column.text
-            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, dataIndex: column.dataIndex });
+            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, text: column.text });
         }).compact().value();
+    },
+    _applyStatefulColumns: function(columns) {
+        if (this.alwaysShowDefaultColumns) {
+            _.each(this.columnCfgs, function(columnCfg) {
+                if (!_.any(columns, {dataIndex: this._getColumnName(columnCfg)})) {
+                    columns.push(columnCfg);
+                }
+            }, this);
+        }
+
+        if (this.config && this.config.derivedColumns){
+            this.columnCfgs = columns.concat(this.config.derivedColumns);
+        } else {
+            this.columnCfgs = columns;
+        }
+
     }
 });
 

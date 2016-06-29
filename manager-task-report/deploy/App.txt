@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 28 2016 18:48:08 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jun 29 2016 16:33:55 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 28 2016 18:48:08 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Jun 29 2016 16:33:55 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 81355920886;
+        var CHECKSUM = 90928045464;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -249,6 +249,30 @@ Ext.define("CArABU.technicalservices.BurndownCalculator", {
         ];
     }
 });
+Ext.define('CArABU.technicalservices.InitiativeTemplate',{
+    extend: 'Ext.XTemplate',
+
+    constructor: function(config) {
+        var templateConfig = [
+            '<tpl if="this.getParent(values)">{[this.createDetailUrl(values)]}</tpl>',
+            {
+                getParent:function (recordData) {
+                    return recordData && recordData.Feature && recordData.Feature.Parent
+                },
+                createDetailUrl:function (recordData) {
+                    var parent = this.getParent(recordData);
+                    return Rally.util.DetailLink.getLink({
+                            record: parent,
+                            showHover: !!this.showHover,
+                            text: parent.FormattedID
+                        }) + ': ' + parent._refObjectName;
+                }
+            }
+        ];
+
+        return this.callParent(templateConfig);
+    }
+});
 Ext.override(Rally.ui.grid.TreeGrid, {
     _mergeColumnConfigs: function(newColumns, oldColumns) {
 
@@ -267,8 +291,24 @@ Ext.override(Rally.ui.grid.TreeGrid, {
     _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
         return _(this.headerCt.items.getRange()).map(function(column) {
             //override:  Added additional search for column.text
-            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, dataIndex: column.dataIndex });
+            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, text: column.text });
         }).compact().value();
+    },
+    _applyStatefulColumns: function(columns) {
+        if (this.alwaysShowDefaultColumns) {
+            _.each(this.columnCfgs, function(columnCfg) {
+                if (!_.any(columns, {dataIndex: this._getColumnName(columnCfg)})) {
+                    columns.push(columnCfg);
+                }
+            }, this);
+        }
+
+        if (this.config && this.config.derivedColumns){
+            this.columnCfgs = columns.concat(this.config.derivedColumns);
+        } else {
+            this.columnCfgs = columns;
+        }
+
     }
 });
 
@@ -391,7 +431,6 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
      *      function(){ return false; }
      */
     showDangerNotificationFn: function(values) {
-        console.log('showDangerNotificationFn',values);
         if (!values["Estimate"]){
             return true;
         }
@@ -422,7 +461,6 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
      * Defaults to a function that returns the percentage complete.
      */
     generateLabelTextFn: function (recordData) {
-        console.log('generateLabelTextFn',recordData);
         return this.calculatePercent(recordData) + '%';
     },
 
@@ -471,13 +509,19 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
         calculateWidth: function (recordData) {
             var percentDone = this.calculatePercent(recordData);
             return percentDone > 100 ? '100%' : percentDone + '%';
+        },
+        getDangerTooltip: function(recordData){
+            if (!recordData["Estimate"]){
+                return "No Estimate on Task.";
+            }
+            return "";
         }
     },
 
     constructor: function(config) {
         var templateConfig = config && config.template || [
                 '<tpl>',
-                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div data-qtip="{[this.getDangerTooltip(values)]}" class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
                 '<div class="rly-progress-bar" style="background-color: {[this.calculateColorFn(values)]}; width: {[this.calculateWidth(values)]}; "></div>',
                 '<tpl if="this.showDangerNotificationFn(values)">',
                 '<div class="progress-bar-danger-notification"></div>',
@@ -504,7 +548,7 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-
+        Ext.QuickTips.init();
         me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
             denominatorField: me.denominatorField,
             numeratorField: me.numeratorField
@@ -533,7 +577,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-        console.log('this', this);
 
         me.tpl = Ext.create('Ext.XTemplate',
             '<div aria-label="Edit Schedule State: {ScheduleState}" class="schedule-state-wrapper " style="width: 100%">',
@@ -545,7 +588,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
                     var snap = Ext.Array.filter(this.historicalRecords, function(r){
                         return r.get('ObjectID') === values['ObjectID'];
                     });
-                    console.log('getHistoricalField', values, snap)
                     if (snap && snap.length > 0){
                         return snap[0].get(this.historyField) || "";
                     }
@@ -589,10 +631,6 @@ Ext.define('CArABU.technicalservices.HistoricalStateTemplateColumn', {
                         }
                     }, this);
 
-                    //if(this.showTrigger){
-                    //    returnVal.push('<div class="editor-trigger icon-chevron-down"></div>');
-                    //}
-                    console.log('renderStates', returnVal);
                     return returnVal.join('');
                 },
                 _getSymbolState: function(recordData, state) {
@@ -622,7 +660,6 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
 
     initComponent: function(){
         var me = this;
-        console.log('this', this);
 
         me.tpl = Ext.create('Ext.XTemplate',
             '<div class="{[this.getDeltaDirection(values)]}"></div><span style="color:#A9A9A9">{[this.getDelta(values)]}</span>',{
@@ -633,7 +670,7 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
                         currentValue = values[field] || 0;
 
                     if (currentValue === historicalValue){
-                        return "icon-none history";
+                        return "history";
                     }
                     return currentValue > historicalValue ? "icon-up history" : "icon-down history";
                 },
@@ -643,7 +680,7 @@ Ext.define('CArABU.technicalservices.HistoricalDeltaTemplateColumn', {
                         currentValue = values[field] || 0;
 
                     if (currentValue === historicalValue){
-                        return "";
+                        return "No Change";
                     }
                     return Math.abs(currentValue - historicalValue);
                 },
@@ -680,8 +717,8 @@ Ext.define('CArABU.technicalservices.WorkProductTemplateColumn',{
         if (field === 'Milestones'){
             return Ext.create('Rally.ui.renderer.template.PillTemplate', { collectionName: 'Milestones', iconCls: 'icon-milestone', cls: 'milestone-pill'});
         }
-        if (field === "Predecessors"){
-            return Ext.create('Rally.ui.renderer.template.status.PredecessorsAndSuccessorsStatusTemplate');
+        if (field === "PredecessorsAndSuccessors"){
+            return Ext.create('CArABU.technicalservices.PredecessorsAndSuccessorsStatusTemplate');
         }
 
         if (field === "Feature"){
@@ -712,30 +749,7 @@ Ext.define('CArABU.technicalservices.WorkProductTemplateColumn',{
     }
 });
 
-Ext.define('CArABU.technicalservices.InitiativeTemplate',{
-    extend: 'Ext.XTemplate',
 
-    constructor: function(config) {
-        var templateConfig = [
-            '<tpl if="this.getParent(values)">{[this.createDetailUrl(values)]}</tpl>',
-            {
-                getParent:function (recordData) {
-                    return recordData && recordData.Feature && recordData.Feature.Parent
-                },
-                createDetailUrl:function (recordData) {
-                    var parent = this.getParent(recordData);
-                    return Rally.util.DetailLink.getLink({
-                            record: parent,
-                            showHover: !!this.showHover,
-                            text: parent.FormattedID
-                        }) + ': ' + parent._refObjectName;
-                }
-            }
-        ];
-
-        return this.callParent(templateConfig);
-    }
-});
 Ext.define('CArABU.technicalservices.UserManagerStore',{
     logger: new Rally.technicalservices.Logger(),
     mixins: {
@@ -831,7 +845,6 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
         this.leaf = false;
     },
     getChildren: function(){
-        console.log('getChildren', this.displayName, this.timestamp, Ext.clone(this.children), this.children);
         if (!this.children){
             this.children = [];
         }
@@ -937,7 +950,7 @@ Ext.define('CArABU.technicalservices.UserTree',{
                     mgrObj.addChild(userObj);
                 }
             }
-            console.log('users', this.userTree, empId, this.employeeIDField);
+
         }, this);
 
         //Todo clean out all users other than root.
@@ -959,7 +972,6 @@ Ext.define('CArABU.technicalservices.UserTree',{
                 this.userTree = {};
             }
             employeeId = employeeId.toString();
-            console.log('getUserItem', employeeId,this.userTree[employeeId] && this.userTree[employeeId].displayName, this.userTree[employeeId] && this.userTree[employeeId].getChildren().length );
             if (!this.userTree[employeeId]){
                 this.userTree[employeeId] = Ext.create('CArABU.technicalservices.UserTreeItem',{
                     employeeId: employeeId
@@ -1061,6 +1073,40 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
     },{
         name: 'taskIds'
     }]
+});
+
+/**
+ * Copied the Rally PredecessorsAndSuccessorsStatusTemplate and adjusted for PredecessorsAndSuccessors property not populating as expected.
+ * Also added some modifications to the template
+ */
+Ext.define('CArABU.technicalservices.PredecessorsAndSuccessorsStatusTemplate', {
+    extend: 'Rally.ui.renderer.template.status.StatusTemplate',
+
+    inheritableStatics: {
+        onClick: function(event, ref) {
+            Rally.ui.renderer.template.status.StatusTemplate.onClick(event, ref, {
+                field: 'PredecessorsAndSuccessors'
+            });
+        }
+    },
+
+    constructor: function() {
+        this.callParent([
+            '<tpl if="this._getDependenciesCount(values) &gt; 0">',
+            '<a onclick="{[this._getOnClick(values)]}">',
+            '<div class="icon-predecessor"></div><span class="dependency-link predecessorsandsuccessors-cnt">{[this._getDependenciesCount(values)]}</span>',
+            '</a>',
+            '</tpl>'
+        ]);
+    },
+
+    _getDependenciesCount: function (recordData) {
+        return recordData.Predecessors.Count + recordData.Successors.Count;
+    },
+
+    _getOnClick: function(recordData) {
+        return 'Rally.ui.renderer.template.status.PredecessorsAndSuccessorsStatusTemplate.onClick(event, \'' + recordData.Predecessors._ref + '\'); return false;';
+    }
 });
 
 Ext.define("manager-task-report", {
@@ -1166,7 +1212,8 @@ Ext.define("manager-task-report", {
         this.down('#manager_box').add({
             xtype: 'rallyiterationcombobox',
             fieldLabel: 'Iteration',
-            labelAlign: 'right'
+            labelAlign: 'right',
+            margin: 10
         });
     },
     _addManagerFilters: function(){
@@ -1178,6 +1225,7 @@ Ext.define("manager-task-report", {
             labelAlign: 'right',
             allowNoEntry: true,
             value: null,
+            margin: 10,
             width: 300,
             remoteFilter: false,
             storeConfig: {
@@ -1208,13 +1256,24 @@ Ext.define("manager-task-report", {
 
         this._addIterationFilter();
         this._addManagerFilters();
+        this._addMilestonePicker();
 
         var btn = this.down('#manager_box').add({
             xtype: 'rallybutton',
-            text: 'Update'
+            text: 'Update',
+            margin: 10
         });
         btn.on('click', this._fetchTasks, this);
 
+    },
+    _addMilestonePicker: function(){
+        this.down('#manager_box').add({
+            fieldLabel: 'Milestone(s)',
+            labelAlign: 'right',
+            width: 300,
+            margin: 10,
+            xtype: 'rallymilestonepicker'
+        });
     },
     getSelectedManagerId: function(){
         return this.down('rallyusercombobox') && this.down('rallyusercombobox').getValue() || null;
@@ -1234,6 +1293,22 @@ Ext.define("manager-task-report", {
             }]);
         }
         return null;
+    },
+    getSelectedMilestones: function(){
+        var milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
+        this.logger.log('getSelectedMilestones', milestones);
+        if (milestones && milestones.length > 0){
+            var milestoneFilter = Ext.Array.map(milestones, function(m){
+                return {
+                    property: "WorkProduct.Milestones",
+                    value: m.get('_ref')
+                };
+            });
+            return Rally.data.wsapi.Filter.or(milestoneFilter);
+        }
+        return null;
+
+
     },
     getManagerRecords: function(){
        return this.managerRecords;
@@ -1267,6 +1342,12 @@ Ext.define("manager-task-report", {
             filters = filters.and(iterationFilter);
 
         }
+
+        var milestoneFilter = this.getSelectedMilestones();
+        if (milestoneFilter){
+            filters = filters.and(milestoneFilter);
+        }
+
         this.logger.log('_getWsapiTaskFilters',filters.toString());
         return filters;
     },
@@ -1546,7 +1627,7 @@ Ext.define("manager-task-report", {
 
         var employeeId = user.get('employeeId'),
             filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
-
+        this.setLoading("Loading Task Details...");
         this.logger.log('_addDetailGrid filters', filters.toString());
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
@@ -1589,21 +1670,21 @@ Ext.define("manager-task-report", {
                                         }
                                     }
                                 }
-                            },{
-                                ptype: 'rallygridboardactionsmenu',
-                                menuItems: [
-                                    {
-                                        text: 'Export...',
-                                        handler: function() {
-                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
-                                                this.down('rallygridboard').getGridOrBoard());
-                                        },
-                                        scope: this
-                                    }
-                                ],
-                                buttonConfig: {
-                                    iconCls: 'icon-export'
-                                }
+                            //},{
+                            //    ptype: 'rallygridboardactionsmenu',
+                            //    menuItems: [
+                            //        {
+                            //            text: 'Export...',
+                            //            handler: function() {
+                            //                window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                            //                    this.down('rallygridboard').getGridOrBoard());
+                            //            },
+                            //            scope: this
+                            //        }
+                            //    ],
+                            //    buttonConfig: {
+                            //        iconCls: 'icon-export'
+                            //    }
                             }],
                             cardBoardConfig: {
                                 attribute: 'State'
@@ -1626,8 +1707,10 @@ Ext.define("manager-task-report", {
                 });
     },
     _loadWorkProducts: function(store, node, records, success){
+        this.setLoading("Loading Work Product data...");
         this.logger.log('_loadWorkProducts', records, success);
-        var objectIds = _.map(records, function(r){
+        var maxObjectIds = 25,
+            objectIds = _.map(records, function(r){
             return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0
         });
         objectIds = _.uniq(objectIds);
@@ -1639,24 +1722,55 @@ Ext.define("manager-task-report", {
         });
 
 
-        Ext.create('Rally.data.wsapi.artifact.Store',{
-            models: ['UserStory','Defect'],
-            fetch: ['ObjectID','Predecessors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
-            filters: Rally.data.wsapi.Filter.or(objectIds),
-            limit: 'Infinity'
-        }).load({
-            callback: function(artifacts, operation){
-                this.logger.log('ArtifactsLoaded', artifacts, operation);
-                var artifactHash = {};
+        var promises = [];
+        for (var i= 0, j=objectIds.length; i<j; i+=maxObjectIds){
+            var tempArray = objectIds.slice(i,i+maxObjectIds);
+            promises.push(this._fetchWsapiArtifactData({
+                models: ['UserStory','Defect'],
+                //model: 'UserStory',
+                compact: false,
+                fetch: ['ObjectID','Predecessors','Successors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
+                filters: Rally.data.wsapi.Filter.or(tempArray),
+                limit: 'Infinity'
+            }));
+        }
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                var artifactHash = {},
+                    artifacts = _.flatten(results);
+
                 Ext.Array.each(artifacts, function(a){
                     artifactHash[a.get('ObjectID')] = a.getData();
                 });
                 Ext.Array.each(records, function(r){
                     r.set('WorkProduct', artifactHash[r.get('WorkProduct').ObjectID]);
                 });
+                this.setLoading(false);
+
+            },
+            failure: function(msg){
+                this.setLoading(false);
+                Rally.ui.notify.Notifier.showError({ message: msg });
+
             },
             scope: this
         });
+
+    },
+    _fetchWsapiArtifactData: function(config){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.artifact.Store', config).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    deferred.reject("Error fetching work product data: " + operation.error && operation.error.errors && operation.error.errors.join(','));
+                }
+            }
+        });
+
+        return deferred;
     },
     _getDefaultColumns: function(){
         var columns = [{
@@ -1665,7 +1779,7 @@ Ext.define("manager-task-report", {
         },{
             text: 'Work Product Dependencies',
             xtype: 'workproducttemplatecolumn',
-            workProductField: 'Predecessors'
+            workProductField: 'PredecessorsAndSuccessors'
         },{
             text: 'Work Product Milestones',
             xtype: 'workproducttemplatecolumn',
@@ -1697,17 +1811,6 @@ Ext.define("manager-task-report", {
         }
         return columns;
 
-        //    text: 'Story Dependencies',
-        //    xtype: 'workproductdependencytemplatecolumn'
-        //},{
-        //    text: 'Story Feature',
-        //    xtype: 'workproductfeaturetemplatecolumn'
-        //},{
-        //    text: 'Story Initiative',
-        //    xtype: 'workproductinitiativetemplatecolumn'
-        //},{
-        //    text: 'Story Milestones',
-        //    xtype: 'workproductmilestonestemplatecolumn'
     },
     _getDetailColumnCfgs: function(){
        var columns = [{
@@ -1789,7 +1892,7 @@ Ext.define("manager-task-report", {
                     if (value > 0){
                         return '<div class="icon-up"></div>' + value;
                     }
-                    return '<div class="icon-none"></div>';
+                    return 'No Change';
                 }
             });
         }
@@ -1901,6 +2004,21 @@ Ext.define("manager-task-report", {
 .history {
     color: #A9A9A9!important;
     padding: 5px;
+}
+.dependency-link{
+    cursor: pointer;
+    color: #337ec6;
+}
+[notification]:before{
+    position: absolute;
+    content: attr(notification);
+    opacity: 0;
+}
+[notification]:hover:before{
+    opacity: 1;
+}
+[notification]:not([notification-persistent]):before {
+    pointer-events: none;
 }
     </style>
 

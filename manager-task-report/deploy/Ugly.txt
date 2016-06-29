@@ -3,10 +3,10 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 28 2016 18:48:09 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Jun 29 2016 16:33:55 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 28 2016 18:48:09 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Jun 29 2016 16:33:55 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -69,6 +69,21 @@
 .history {
     color: #A9A9A9!important;
     padding: 5px;
+}
+.dependency-link{
+    cursor: pointer;
+    color: #337ec6;
+}
+[notification]:before{
+    position: absolute;
+    content: attr(notification);
+    opacity: 0;
+}
+[notification]:hover:before{
+    opacity: 1;
+}
+[notification]:not([notification-persistent]):before {
+    pointer-events: none;
 }
     </style>
 
