@@ -724,7 +724,7 @@ Ext.define("manager-task-report", {
                     if (value > 0){
                         return '<div class="icon-up"></div>' + value;
                     }
-                    return "No Change";
+                    return '<div class="icon-none"></div>';
                 }
             });
         }

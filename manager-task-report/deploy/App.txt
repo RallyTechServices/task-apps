@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jun 28 2016 18:39:44 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Jun 28 2016 18:48:08 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jun 28 2016 18:39:44 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Jun 28 2016 18:48:08 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 81283887856;
+        var CHECKSUM = 81355920886;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1789,7 +1789,7 @@ Ext.define("manager-task-report", {
                     if (value > 0){
                         return '<div class="icon-up"></div>' + value;
                     }
-                    return "No Change";
+                    return '<div class="icon-none"></div>';
                 }
             });
         }
