@@ -73,7 +73,7 @@ Ext.define("manager-task-report", {
         return this.getSetting('costCenter');
     },
     getTaskFetchList: function(){
-        return ['ObjectID','FormattedID','Name','ToDo','Estimate','State','Owner','Milestones',this.getEmployeeIDField(),this.getManagerEmployeeIDField()];
+        return ['ObjectID','FormattedID','Name','ToDo','Estimate','State','Owner','Milestones','WorkProduct',this.getEmployeeIDField(),this.getManagerEmployeeIDField()];
     },
     _getAllManagerFilters: function(){
         return [{
@@ -298,6 +298,7 @@ Ext.define("manager-task-report", {
         }
         Deft.Promise.all(promises).then({
             success: function(results){
+                this.historicalRecords = _.flatten(results);
                 deferred.resolve(_.flatten(results));
             },
             failure: function(msg){
@@ -482,8 +483,6 @@ Ext.define("manager-task-report", {
             filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
 
         this.logger.log('_addDetailGrid filters', filters.toString());
-
-
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
                     autoLoad: false,
@@ -492,12 +491,15 @@ Ext.define("manager-task-report", {
                     filters: filters
                 }).then({
                     success: function(store) {
+//                        store.model.addField('WorkProductRecord');
+                        store.on('load', this._loadWorkProducts, this);
+
                         this.down('#detail_box').add({
                             xtype: 'rallygridboard',
                             context: this.getContext(),
                             modelNames: ['task'],
                             stateful: false,
-                            stateId: "grid-13",
+                            stateId: "grid-100",
                             itemId: 'detail-grid',
                             toggleState: 'grid',
                             plugins: [{
@@ -505,7 +507,7 @@ Ext.define("manager-task-report", {
                                 headerPosition: 'left',
                                 modelNames: ['task'],
                                 stateful: true,
-                                stateId: this.getContext().getScopedStateId('detail-columns-13')
+                                stateId: this.getContext().getScopedStateId('detail-columns-100')
                             },{
                                 ptype: 'rallygridboardinlinefiltercontrol',
                                 inlineFilterButtonConfig: {
@@ -544,13 +546,10 @@ Ext.define("manager-task-report", {
                             gridConfig: {
                                 store: store,
                                 storeConfig: {
-                                    filters: filters,
-                                   // fetch: this.getTaskFetchList(),
-                                    load: function(store, records, success){
-                                        console.log('load', records)
-                                    }
+                                    filters: filters
                                 },
                                 rankColumnDataIndex: 'TaskIndex',
+                                remoteSort: true,
                                 enableRanking: false,
                                 columnCfgs: this._getDetailColumnCfgs(),
                                 derivedColumns: this._getDefaultColumns()
@@ -560,16 +559,90 @@ Ext.define("manager-task-report", {
                     },
                     scope: this
                 });
+    },
+    _loadWorkProducts: function(store, node, records, success){
+        this.logger.log('_loadWorkProducts', records, success);
+        var objectIds = _.map(records, function(r){
+            return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0
+        });
+        objectIds = _.uniq(objectIds);
+        objectIds = Ext.Array.map(objectIds, function(o){
+            return {
+                property: 'ObjectID',
+                value: o
+            }
+        });
 
 
-
-
+        Ext.create('Rally.data.wsapi.artifact.Store',{
+            models: ['UserStory','Defect'],
+            fetch: ['ObjectID','Predecessors','Milestones','Feature','Parent','Name','FormattedID','PlanEstimate'],
+            filters: Rally.data.wsapi.Filter.or(objectIds),
+            limit: 'Infinity'
+        }).load({
+            callback: function(artifacts, operation){
+                this.logger.log('ArtifactsLoaded', artifacts, operation);
+                var artifactHash = {};
+                Ext.Array.each(artifacts, function(a){
+                    artifactHash[a.get('ObjectID')] = a.getData();
+                });
+                Ext.Array.each(records, function(r){
+                    r.set('WorkProduct', artifactHash[r.get('WorkProduct').ObjectID]);
+                });
+            },
+            scope: this
+        });
     },
     _getDefaultColumns: function(){
-        return [{
+        var columns = [{
             text: '% Completed',
             xtype: 'pctcompletetemplatecolumn'
+        },{
+            text: 'Work Product Dependencies',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Predecessors'
+        },{
+            text: 'Work Product Milestones',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Milestones'
+        },{
+            text: 'Work Product Feature',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Feature'
+        },{
+            text: 'Work Product Initiative',
+            xtype: 'workproducttemplatecolumn',
+            workProductField: 'Initiative'
         }];
+        if (this.showHistoricalData()){
+            columns = columns.concat([{
+                text: 'Historical State',
+                xtype: 'historicalstatetemplate',
+                historyField: 'State',
+                historicalRecords: this.historicalRecords,
+                width: 70,
+                align: 'center'
+            },{
+                text: 'Delta ToDo',
+                xtype: 'historicaldeltatemplate',
+                deltaField: 'ToDo',
+                historicalRecords: this.historicalRecords,
+                width: 60,
+                align: 'center'}]);
+        }
+        return columns;
+
+        //    text: 'Story Dependencies',
+        //    xtype: 'workproductdependencytemplatecolumn'
+        //},{
+        //    text: 'Story Feature',
+        //    xtype: 'workproductfeaturetemplatecolumn'
+        //},{
+        //    text: 'Story Initiative',
+        //    xtype: 'workproductinitiativetemplatecolumn'
+        //},{
+        //    text: 'Story Milestones',
+        //    xtype: 'workproductmilestonestemplatecolumn'
     },
     _getDetailColumnCfgs: function(){
        var columns = [{
@@ -583,13 +656,6 @@ Ext.define("manager-task-report", {
             text: 'Todo'
         },{
             dataIndex: 'State'
-        },{
-            dataIndex: 'Owner',
-            text: 'Owner',
-            flex: 1,
-            renderer: function(v,m,r){
-                return v._refObjectName;
-            }
         }];
 
         return columns.concat(this._getDefaultColumns());

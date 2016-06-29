@@ -41,6 +41,14 @@ Ext.define('CArABU.technicalservices.ManagerTaskReport.Settings',{
             labelAlign: 'right',
             labelWidth: labelWidth,
             name: 'showHistoricalData'
+        },{
+            xtype: 'rallynumberfield',
+            fieldLabel: 'Days Back (Historical Data)',
+            labelAlign: 'right',
+            labelWidth: labelWidth,
+            name: 'daysBack',
+            minValue: 7,
+            maxValue: 366
         }];
     }
 });

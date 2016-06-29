@@ -3,10 +3,10 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Jun 27 2016 18:02:10 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Jun 28 2016 18:39:44 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Jun 27 2016 18:02:10 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Jun 28 2016 18:39:44 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -44,6 +44,31 @@
 
 .configuration-error {
     color: red;
+}
+
+.historical-state {
+    background-color: #888!important;
+    border-radius: 2px;
+    height: 16px!important;
+    width: 18px!important;
+}
+
+.historical-before-state {
+    background-color: #d6d6d6!important;
+}
+.historical-schedule-state {
+    background-color: white;
+    color: white;
+    float: left;
+    font-family: NotoSansBold,Helvetica,Arial;
+    font-size: 12px;
+    height: 14px;
+    max-width: 18px;
+    text-align: center;
+}
+.history {
+    color: #A9A9A9!important;
+    padding: 5px;
 }
     </style>
 
