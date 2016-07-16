@@ -542,7 +542,7 @@ Ext.define("manager-task-report", {
                                 headerPosition: 'left',
                                 modelNames: ['task'],
                                 stateful: true,
-                                stateId: this.getContext().getScopedStateId('detail-columns-100')
+                                stateId: this.getContext().getScopedStateId('detail-columns-0716')
                             },{
                                 ptype: 'rallygridboardinlinefiltercontrol',
                                 inlineFilterButtonConfig: {
@@ -559,21 +559,21 @@ Ext.define("manager-task-report", {
                                         }
                                     }
                                 }
-                            //},{
-                            //    ptype: 'rallygridboardactionsmenu',
-                            //    menuItems: [
-                            //        {
-                            //            text: 'Export...',
-                            //            handler: function() {
-                            //                window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
-                            //                    this.down('rallygridboard').getGridOrBoard());
-                            //            },
-                            //            scope: this
-                            //        }
-                            //    ],
-                            //    buttonConfig: {
-                            //        iconCls: 'icon-export'
-                            //    }
+                            },{
+                                ptype: 'rallygridboardactionsmenu',
+                                menuItems: [
+                                    {
+                                        text: 'Export...',
+                                        handler: function() {
+                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                                                this.down('rallygridboard').getGridOrBoard());
+                                        },
+                                        scope: this
+                                    }
+                                ],
+                                buttonConfig: {
+                                    iconCls: 'icon-export'
+                                }
                             }],
                             cardBoardConfig: {
                                 attribute: 'State'

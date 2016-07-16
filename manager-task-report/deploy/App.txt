@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Wed Jun 29 2016 16:33:55 GMT-0600 (MDT) -->
+    <!--  Build Date: Sat Jul 16 2016 11:04:15 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Jun 29 2016 16:33:55 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sat Jul 16 2016 11:04:15 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 90928045464;
+        var CHECKSUM = 92187437791;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -289,10 +289,20 @@ Ext.override(Rally.ui.grid.TreeGrid, {
         return mergedColumns;
     },
     _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
-        return _(this.headerCt.items.getRange()).map(function(column) {
+        var cols = _(this.headerCt.items.getRange()).map(function(column) {
             //override:  Added additional search for column.text
             return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, text: column.text });
         }).compact().value();
+
+        return cols;
+    },
+    _restoreColumnOrder: function(columnConfigs) {
+
+        var currentColumns = this._getColumnConfigsBasedOnCurrentOrder(columnConfigs);
+        var addedColumns = _.filter(columnConfigs, function(config) {
+            return !_.find(currentColumns, {dataIndex: config.dataIndex}) || Ext.isString(config);
+        });
+        return currentColumns.concat(addedColumns);
     },
     _applyStatefulColumns: function(columns) {
         if (this.alwaysShowDefaultColumns) {
@@ -1653,7 +1663,7 @@ Ext.define("manager-task-report", {
                                 headerPosition: 'left',
                                 modelNames: ['task'],
                                 stateful: true,
-                                stateId: this.getContext().getScopedStateId('detail-columns-100')
+                                stateId: this.getContext().getScopedStateId('detail-columns-0716')
                             },{
                                 ptype: 'rallygridboardinlinefiltercontrol',
                                 inlineFilterButtonConfig: {
@@ -1670,21 +1680,21 @@ Ext.define("manager-task-report", {
                                         }
                                     }
                                 }
-                            //},{
-                            //    ptype: 'rallygridboardactionsmenu',
-                            //    menuItems: [
-                            //        {
-                            //            text: 'Export...',
-                            //            handler: function() {
-                            //                window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
-                            //                    this.down('rallygridboard').getGridOrBoard());
-                            //            },
-                            //            scope: this
-                            //        }
-                            //    ],
-                            //    buttonConfig: {
-                            //        iconCls: 'icon-export'
-                            //    }
+                            },{
+                                ptype: 'rallygridboardactionsmenu',
+                                menuItems: [
+                                    {
+                                        text: 'Export...',
+                                        handler: function() {
+                                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                                                this.down('rallygridboard').getGridOrBoard());
+                                        },
+                                        scope: this
+                                    }
+                                ],
+                                buttonConfig: {
+                                    iconCls: 'icon-export'
+                                }
                             }],
                             cardBoardConfig: {
                                 attribute: 'State'

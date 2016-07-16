@@ -14,10 +14,20 @@ Ext.override(Rally.ui.grid.TreeGrid, {
         return mergedColumns;
     },
     _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
-        return _(this.headerCt.items.getRange()).map(function(column) {
+        var cols = _(this.headerCt.items.getRange()).map(function(column) {
             //override:  Added additional search for column.text
             return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, text: column.text });
         }).compact().value();
+
+        return cols;
+    },
+    _restoreColumnOrder: function(columnConfigs) {
+
+        var currentColumns = this._getColumnConfigsBasedOnCurrentOrder(columnConfigs);
+        var addedColumns = _.filter(columnConfigs, function(config) {
+            return !_.find(currentColumns, {dataIndex: config.dataIndex}) || Ext.isString(config);
+        });
+        return currentColumns.concat(addedColumns);
     },
     _applyStatefulColumns: function(columns) {
         if (this.alwaysShowDefaultColumns) {
