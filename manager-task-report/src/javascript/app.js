@@ -278,15 +278,23 @@ Ext.define("manager-task-report", {
             return;
         }
 
+        if (!records || records.length === 0){
+            this.setLoading(false);
+            this.down('#display_box').add({
+                xtype: 'container',
+                html: '<div class="no-data-container"><div class="secondary-message">No tasks were found in the currently selected Iteration and Milestone(s) for the currently selected manager.</div></div>'
+            });
+            return;
+        }
+
         this._fetchHistoricalSummaryTasks(records).then({
             success: function(snapshots){
                 this.setLoading(false);
-                var userItem = this.userTree.getUserItem("320785");
-                this.logger.log('userItem 1', userItem.getChildren().length, userItem.kids && userItem.kids.length);
-
                 var summaryStore = this._buildSummaryStore(records, snapshots);
 
                 this.logger.log('_createSummaryGrid', summaryStore);
+
+
                 this.down('#display_box').add({
                     xtype: 'treepanel',
                     itemId: 'summary-grid',
@@ -319,6 +327,7 @@ Ext.define("manager-task-report", {
         });
         this.logger.log('_fetchHistoricalSummaryTasks users', tasks);
 
+
         var promises = [];
         for (var i= 0, j=tasks.length; i<j; i+=maxObjectIds){
             var tempArray = tasks.slice(i,i+maxObjectIds);
@@ -331,17 +340,24 @@ Ext.define("manager-task-report", {
                 limit: 'Infinity'
             }));
         }
-        Deft.Promise.all(promises).then({
-            success: function(results){
-                this.historicalRecords = _.flatten(results);
-                deferred.resolve(_.flatten(results));
-            },
-            failure: function(msg){
-                Rally.ui.notify.Notifier.showError({ message: "Error loading historical task summary data:  " + msg });
-                deferred.resolve([]);
-            },
-            scope: this
-        });
+
+        if (promises.length > 0){
+            Deft.Promise.all(promises).then({
+                success: function(results){
+                    this.historicalRecords = _.flatten(results);
+                    deferred.resolve(_.flatten(results));
+                },
+                failure: function(msg){
+                    Rally.ui.notify.Notifier.showError({ message: "Error loading historical task summary data:  " + msg });
+                    deferred.resolve([]);
+                },
+                scope: this
+            });
+        } else {
+            this.logger.log('No tasks for the selected criteria');
+            deferred.resolve([]);
+        }
+
 
         return deferred;
     },
