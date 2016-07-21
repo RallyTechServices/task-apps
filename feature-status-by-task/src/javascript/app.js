@@ -58,7 +58,9 @@ Ext.define("feature-status-by-task", {
                 columnCfgs: this.getColumnCfgs(),
                 derivedColumns: this.getCalculatedColumns()
             },
-            height: this.getHeight()
+            height: this.getHeight(),
+            width: '100%',
+            flex: 1
         });
 
     },
@@ -78,22 +80,22 @@ Ext.define("feature-status-by-task", {
     updateSummary: function(totals){
         this.logger.log('updateSummary', totals);
 
-        var tpl = new Ext.XTemplate('<div class="coverageTitle"><b>{workItemsCoveragePercent} %</b> of work items have test coverage ({workItemsCoverage} / {workItemsTotal})</div>',
-            '<div class="tslegend" style="background-color:#8bbc21;">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Stories</div><span class="tslegendspacer">&nbsp;</span></div>',
-            '<div class="tslegend" style="background-color:#c42525">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Defects</div><span class="tslegendspacer">&nbsp;</span></div>',
-            '<div class="tslegend" style="background-color:#2f7ed8">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;TestSets</div><span class="tslegendspacer">&nbsp;</span></div>',
-            '<div class="tslegend" style="background-color:#ccc">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;No Coverage</div><span class="tslegendspacer">&nbsp;</span></div>'
-
-        );
-
-        header.add({
-            xtype: 'container',
-            itemId: 'ct-summary',
-            tpl: tpl,
-            margin: '0 100 0 75',
-            flex: 1
-
-        });
+        //var tpl = new Ext.XTemplate('<div class="coverageTitle"><b>{workItemsCoveragePercent} %</b> of work items have test coverage ({workItemsCoverage} / {workItemsTotal})</div>',
+        //    '<div class="tslegend" style="background-color:#8bbc21;">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Stories</div><span class="tslegendspacer">&nbsp;</span></div>',
+        //    '<div class="tslegend" style="background-color:#c42525">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Defects</div><span class="tslegendspacer">&nbsp;</span></div>',
+        //    '<div class="tslegend" style="background-color:#2f7ed8">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;TestSets</div><span class="tslegendspacer">&nbsp;</span></div>',
+        //    '<div class="tslegend" style="background-color:#ccc">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;No Coverage</div><span class="tslegendspacer">&nbsp;</span></div>'
+        //
+        //);
+        //
+        //header.add({
+        //    xtype: 'container',
+        //    itemId: 'ct-summary',
+        //    tpl: tpl,
+        //    margin: '0 100 0 75',
+        //    flex: 1
+        //
+        //});
 
     },
     showError: function(msg){
