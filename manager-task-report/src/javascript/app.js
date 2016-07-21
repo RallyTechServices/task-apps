@@ -544,6 +544,7 @@ Ext.define("manager-task-report", {
                     autoLoad: false,
                     enableHierarchy: true,
                     fetch: this.getTaskFetchList(),
+                    remoteSort: true,
                     filters: filters
                 }).then({
                     success: function(store) {
@@ -605,7 +606,6 @@ Ext.define("manager-task-report", {
                                     filters: filters
                                 },
                                 rankColumnDataIndex: 'TaskIndex',
-                                remoteSort: true,
                                 enableRanking: false,
                                 columnCfgs: this._getDetailColumnCfgs(),
                                 derivedColumns: this._getDefaultColumns()
