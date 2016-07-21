@@ -102,6 +102,8 @@ Ext.define("manager-task-report", {
             xtype: 'rallyiterationcombobox',
             fieldLabel: 'Iteration',
             labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('iteration-picker'),
             margin: 10
         });
     },
@@ -117,6 +119,8 @@ Ext.define("manager-task-report", {
             margin: 10,
             width: 300,
             remoteFilter: false,
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('manager-picker'),
             storeConfig: {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),
@@ -534,11 +538,13 @@ Ext.define("manager-task-report", {
             filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
         this.setLoading("Loading Task Details...");
         this.logger.log('_addDetailGrid filters', filters.toString());
+
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
                     autoLoad: false,
                     enableHierarchy: true,
                     fetch: this.getTaskFetchList(),
+                    remoteSort: true,
                     filters: filters
                 }).then({
                     success: function(store) {
@@ -600,7 +606,6 @@ Ext.define("manager-task-report", {
                                     filters: filters
                                 },
                                 rankColumnDataIndex: 'TaskIndex',
-                                remoteSort: true,
                                 enableRanking: false,
                                 columnCfgs: this._getDetailColumnCfgs(),
                                 derivedColumns: this._getDefaultColumns()
@@ -612,8 +617,13 @@ Ext.define("manager-task-report", {
                 });
     },
     _loadWorkProducts: function(store, node, records, success){
+        if (!records || records.length === 0){
+            this.setLoading(false);
+            return;
+        }
         this.setLoading("Loading Work Product data...");
         this.logger.log('_loadWorkProducts', records, success);
+
         var maxObjectIds = 25,
             objectIds = _.map(records, function(r){
             return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0

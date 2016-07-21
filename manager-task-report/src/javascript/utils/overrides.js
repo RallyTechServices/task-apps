@@ -1,3 +1,12 @@
+Ext.apply(Ext.data.SortTypes, {
+    asUser: function(s) {
+        if (Ext.isString(s)){
+            return s;
+        }
+        return s && s.DisplayName || s._refObjectName;
+    }
+});
+
 Ext.override(Rally.ui.grid.TreeGrid, {
     _mergeColumnConfigs: function(newColumns, oldColumns) {
 
@@ -88,5 +97,28 @@ Ext.override(Rally.ui.renderer.RendererFactory, {
                 });
             }
         }
-    },
+    }
 });
+//Ext.override(Ext.util.Sorter, {
+//
+//    defaultSorterFn: function(o1, o2) {
+//
+//        var me = this,
+//            transform = me.transform,
+//            v1 = me.getRoot(o1)[me.property],
+//            v2 = me.getRoot(o2)[me.property];
+//        console.log('function',o1,o2,v1,v2,transform,me);
+//        if (transform) {
+//            v1 = transform(v1);
+//            v2 = transform(v2);
+//        } else {
+//            //if (Ext.isObject(v1)){
+//            //    v1 = v1._refObjectName || v1;
+//            //}
+//            //if (Ext.isObject(v2)){
+//            //    v2 = v2._refObjectName || v2;
+//            //}
+//        }
+//        return v1 > v2 ? 1 : (v1 < v2 ? -1 : 0);
+//    }
+//});
