@@ -534,6 +534,7 @@ Ext.define("manager-task-report", {
             filters = this._getWsapiTaskFilters(user.get('employeeId'), true);
         this.setLoading("Loading Task Details...");
         this.logger.log('_addDetailGrid filters', filters.toString());
+
                 Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
                     models: ['task'],
                     autoLoad: false,
@@ -612,8 +613,13 @@ Ext.define("manager-task-report", {
                 });
     },
     _loadWorkProducts: function(store, node, records, success){
+        if (!records || records.length === 0){
+            this.setLoading(false);
+            return;
+        }
         this.setLoading("Loading Work Product data...");
         this.logger.log('_loadWorkProducts', records, success);
+
         var maxObjectIds = 25,
             objectIds = _.map(records, function(r){
             return r.get('WorkProduct') && r.get('WorkProduct').ObjectID || 0
