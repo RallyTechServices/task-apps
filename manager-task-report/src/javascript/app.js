@@ -102,6 +102,8 @@ Ext.define("manager-task-report", {
             xtype: 'rallyiterationcombobox',
             fieldLabel: 'Iteration',
             labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('iteration-picker'),
             margin: 10
         });
     },
@@ -117,6 +119,8 @@ Ext.define("manager-task-report", {
             margin: 10,
             width: 300,
             remoteFilter: false,
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('manager-picker'),
             storeConfig: {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),

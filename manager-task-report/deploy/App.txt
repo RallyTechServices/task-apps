@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 21 2016 08:49:25 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 21 2016 08:55:44 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 21 2016 08:49:25 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Jul 21 2016 08:55:44 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 93517964655;
+        var CHECKSUM = 94158608043;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1223,6 +1223,8 @@ Ext.define("manager-task-report", {
             xtype: 'rallyiterationcombobox',
             fieldLabel: 'Iteration',
             labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('iteration-picker'),
             margin: 10
         });
     },
@@ -1238,6 +1240,8 @@ Ext.define("manager-task-report", {
             margin: 10,
             width: 300,
             remoteFilter: false,
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('manager-picker'),
             storeConfig: {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),
