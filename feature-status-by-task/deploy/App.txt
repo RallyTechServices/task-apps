@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Feature Status by Task</title>
+    <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
+    <!--  Build Date: Thu Jul 21 2016 08:32:38 GMT-0600 (MDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Thu Jul 21 2016 08:32:38 GMT-0600 (MDT)";
+        var BUILDER = "kcorkan";
+        var CHECKSUM = 16434579457;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Rally.ui.dialog.Dialog',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+    title: "Build Information",
+    
+    defaults: { padding: 5, margin: 5 },
+
+    closable: true,
+     
+    draggable: true,
+
+    autoShow: true,
+   
+    width: 350,
+    
+    informationalConfig: null,
+    
+    items: [{xtype:'container', itemId:'information' }],
+    
+    initComponent: function() {
+        var id = Ext.id(this);
+        this.title =  "<span class='icon-help'> </span>" + this.title;
+        this.callParent(arguments);
+    },
+    
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/var BUILDER = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+       
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+   
+        return chk;
+    },
+    
+    _checkChecksum: function(container) {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    var stored_checksum = me._generateChecksum(text);
+                    if ( CHECKSUM !== stored_checksum ) {
+                        deferred.resolve(false);
+                        return;
+                    }
+                }
+                deferred.resolve(true);
+            }
+        });
+        
+        return deferred.promise;
+    },
+    
+    _addToContainer: function(container){
+        var config = Ext.apply({
+            xtype:'container',
+            height: 200,
+            overflowY: true
+        }, this.informationalConfig);
+        
+        container.add(config);
+    },
+    
+    afterRender: function() {
+        var app = Rally.getApp();
+        
+        if ( !Ext.isEmpty( this.informationalConfig ) ) {
+            var container = this.down('#information');
+            this._addToContainer(container);
+            
+        }
+        
+        if (! app.isExternal() ) {
+            this._checkChecksum(app).then({
+                scope: this,
+                success: function(result){
+                    if ( !result ) {
+                        this.addDocked({
+                            xtype:'container',
+                            cls: 'build-info',
+                            dock: 'bottom',
+                            padding: 2,
+                            html:'<span class="icon-warning"> </span>Checksums do not match'
+                        });
+                    }
+                },
+                failure: function(msg){
+                    console.log("oops:",msg);
+                }
+            });
+        } else {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html:'... Running externally'
+            });
+        }
+        this.callParent(arguments);
+    },
+    
+    beforeRender: function() {
+        var me = this;
+        this.callParent(arguments);
+
+        if (this.informationHtml) {
+            this.addDocked({
+                xtype: 'component',
+                componentCls: 'intro-panel',
+                padding: 2,
+                html: this.informationHtml,
+                doc: 'top'
+            });
+        }
+        
+        this.addDocked({
+            xtype:'container',
+            cls: 'build-info',
+            padding: 2,
+            dock:'bottom',
+            html:"This app was created by the CA AC Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html: Ext.String.format("Build date/time: {0} ({1})",
+                    APP_BUILD_DATE,
+                    BUILDER)
+            });
+        }
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('CArABU.technicalservices.FeatureTaskStore',{
+    logger: new Rally.technicalservices.Logger(),
+    MAX_CHUNK_SIZE: 25,
+    TASK_STATES: ['Defined','In-Progress','Completed'],
+
+    load: function(records){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var objectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+
+        this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
+        var promises = [];
+        for (var i=0; i < objectIDs.length; i = i+this.MAX_CHUNK_SIZE){
+            var chunk = Ext.Array.slice(objectIDs, i, i + this.MAX_CHUNK_SIZE);
+            promises.push(this._fetchLBAPIChunk(chunk));
+        }
+
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                this.logger.log('load Success', results);
+                var totals = this._calculateTaskRollups(_.flatten(results), records, objectIDs);
+
+                deferred.resolve(totals);
+            },
+            failure: function(msg){
+                this.logger.log('load Failure', msg);
+            },
+            scope: this
+        });
+
+        return deferred;
+
+    },
+    _calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
+        this.logger.log('_calculateTaskRollups', taskRecords, featureRecords);
+
+        var snapsByOid = this._getSnapsByOid(taskRecords, objectIDs),
+            totalToDo = [0,0,0],
+            totalEstimate = [0,0,0],
+            totalCount = [0,0,0],
+            rollupsByOid = {};
+
+        Ext.Array.each(featureRecords, function(r){
+            var snaps = snapsByOid[r.get('ObjectID')] || null;
+                //rollup = this._calculateRollup(snaps);
+
+            var rollup = null;
+            if (snaps && snaps.length > 0){
+
+                rollup = {
+                    taskCount: [0,0,0],
+                    taskEstimate: [0,0,0],
+                    taskToDo: [0,0,0],
+                    count: {},
+                    estimate: {},
+                    todo: {}
+                };
+
+                for (var i=0; i<snaps.length; i++){
+                    var snap = snaps[i],
+                        state = snap.State,
+                        stateIdx = _.indexOf(this.TASK_STATES, state);
+
+                    rollup.taskCount[stateIdx]++;
+                    rollup.taskEstimate[stateIdx] += (snap.Estimate || 0);
+                    rollup.taskToDo[stateIdx] += (snap.ToDo || 0);
+
+                    if (!rollup.count[state]){
+                        rollup.count[state] = 0;
+                        rollup.estimate[state] = 0;
+                        rollup.todo[state] = 0;
+                    }
+
+                    rollup.count[state]++;
+                    rollup.estimate[state] += (snap.Estimate || 0);
+                    rollup.todo[state] += (snap.ToDo || 0)
+                }
+
+                for (var i=0; i < this.TASK_STATES.length; i++){
+                    totalToDo[i] += rollup.taskToDo[i];
+                    totalEstimate[i] += rollup.taskEstimate[i];
+                    totalCount[i]+= rollup.taskCount[i];
+                }
+            }
+            this.logger.log('_calculateRollup', r.get('FormattedID'), rollup);
+            rollupsByOid[r.get('ObjectID')] = rollup;
+        }, this);
+        this.logger.log('_calculateRollup totals (ToDo, Estimate, Count)', totalToDo, totalEstimate, totalCount);
+        var totals = {taskToDo: totalToDo, taskEstimate: totalEstimate, taskCount: totalCount};
+
+        Ext.Array.each(featureRecords, function(r){
+            var rollup = rollupsByOid[r.get('ObjectID')] || null;
+            if (rollup){
+                rollup.totals = totals;
+            }
+            r.set('rollup', rollup);
+        });
+
+        return totals;
+
+    },
+    _calculateRollup: function(snaps){
+
+        var rollup = null;
+        if (snaps && snaps.length > 0){
+
+            rollup = {
+                taskCount: [0,0,0],
+                taskEstimate: [0,0,0],
+                taskToDo: [0,0,0],
+                count: {},
+                estimate: {},
+                todo: {}
+            };
+
+            for (var i=0; i<snaps.length; i++){
+                var snap = snaps[i],
+                    state = snap.State,
+                    stateIdx = _.indexOf(this.TASK_STATES, state);
+
+                rollup.taskCount[stateIdx]++;
+                rollup.taskEstimate[stateIdx] += (snap.Estimate || 0);
+                rollup.taskToDo[stateIdx] += (snap.ToDo || 0)
+
+                if (!rollup.count[state]){
+                    rollup.count[state] = 0;
+                    rollup.estimate[state] = 0;
+                    rollup.todo[state] = 0;
+                }
+
+                rollup.count[state]++;
+                rollup.estimate[state] += (snap.Estimate || 0);
+                rollup.todo[state] += (snap.ToDo || 0)
+            }
+        }
+        this.logger.log('_calculateRollup', rollup);
+        return rollup;
+
+    },
+    _getSnapsByOid: function(snapshots, featureObjectIDs){
+        var hash = {};
+        for (var i=0; i< snapshots.length; i++){
+            var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
+                objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
+
+            if (!hash[objectID]){
+                hash[objectID] = [];
+            }
+            hash[objectID].push(snapshots[i].getData());
+        }
+        return hash;
+    },
+    _fetchLBAPIChunk: function(objectIDs){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.lookback.SnapshotStore',{
+            fetch: this._getLBAPIFetchList(),
+            filters: [
+                {
+                    property: '_ItemHierarchy',
+                    operator: 'in',
+                    value: objectIDs
+                },{
+                    property: '_TypeHierarchy',
+                    value: 'Task'
+                },{
+                    property: '__At',
+                    value: "current"
+                }
+
+            ],
+            hydrate: ['State'],
+            sorters: [{
+                property: 'ObjectID',
+                direction: 'ASC'
+            }],
+            compress: true,
+            removeUnauthorizedSnapshots: true
+        }).load({
+            callback: function(records, operation, success){
+                if (success){
+                    deferred.resolve(records);
+                } else {
+                    var msg = "Failure loading snapshots for objectIDs: " + objectIDs.join(', ') + ":  " + operation.error.errors.join(',');
+                    deferred.resolve(msg);
+                }
+            }
+        });
+        return deferred;
+    },
+    _fetchChunk: function(objectIDs){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var filters = _.map(objectIDs, function(o){ return {
+                property: "Feature.ObjectID",
+                value: o
+            }
+        });
+        filters = Rally.data.wsapi.Filter.or(filters);
+
+        filters = filters.and({
+            property: "Tasks.ObjectID",
+            operator: '>',
+            value: 0
+        });
+
+        Ext.create('Rally.data.wsapi.Store',{
+            fetch: this._getFetchList(),
+            filters: filters,
+            model: 'HierarchicalRequirement'
+        }).load({
+            callback: function(records, operation, success){
+                if (success){
+                    deferred.resolve(records);
+                } else {
+                    var msg = "Failure loading records for objectIDs: " + objectIDs.join(', ') + ":  " + operation.error.errors.join(',');
+                    deferred.resolve(msg);
+                }
+            }
+        });
+        return deferred;
+    },
+    _getFetchList: function(){
+        return ['ObjectID','Feature','Tasks','State','Estimate','ToDo'];
+    },
+    _getLBAPIFetchList: function(){
+        return ['ObjectID','State','Estimate','ToDo','_ItemHierarchy'];
+    }
+
+});
+Ext.override(Rally.ui.grid.TreeGrid, {
+    _mergeColumnConfigs: function(newColumns, oldColumns) {
+
+        var mergedColumns= _.map(newColumns, function(newColumn) {
+            var oldColumn = _.find(oldColumns, {dataIndex: this._getColumnName(newColumn)});
+            if (oldColumn) {
+                return this._getColumnConfigFromColumn(oldColumn);
+            }
+
+            return newColumn;
+        }, this);
+        mergedColumns = mergedColumns.concat(this.config.derivedColumns);
+        return mergedColumns;
+    },
+    _getColumnConfigsBasedOnCurrentOrder: function(columnConfigs) {
+        var cols = _(this.headerCt.items.getRange()).map(function(column) {
+            //override:  Added additional search for column.text
+            return _.contains(columnConfigs, column.dataIndex) ? column.dataIndex : _.find(columnConfigs, {xtype: column.xtype, text: column.text });
+        }).compact().value();
+
+        return cols;
+    },
+    _restoreColumnOrder: function(columnConfigs) {
+
+        var currentColumns = this._getColumnConfigsBasedOnCurrentOrder(columnConfigs);
+        var addedColumns = _.filter(columnConfigs, function(config) {
+            return !_.find(currentColumns, {dataIndex: config.dataIndex}) || Ext.isString(config);
+        });
+        return currentColumns.concat(addedColumns);
+    },
+    _applyStatefulColumns: function(columns) {
+        if (this.alwaysShowDefaultColumns) {
+            _.each(this.columnCfgs, function(columnCfg) {
+                if (!_.any(columns, {dataIndex: this._getColumnName(columnCfg)})) {
+                    columns.push(columnCfg);
+                }
+            }, this);
+        }
+
+        if (this.config && this.config.derivedColumns){
+            this.columnCfgs = columns.concat(this.config.derivedColumns);
+        } else {
+            this.columnCfgs = columns;
+        }
+
+    }
+});
+
+
+
+Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
+    extend: 'Ext.XTemplate',
+
+    /**
+     * @cfg {String}
+     * define a width if necessary to fit where it's being used
+     */
+    width: '100%',
+    /**
+     * @cfg {String}
+     * define a height if necessary to fit where it's being used
+     */
+    height: '20px',
+
+    config: {
+
+        calculateColorFn: function(stateIdx){
+            var colors = ['#FF8200','#7CAFD7','#8DC63F'];
+            return colors[stateIdx];
+        },
+        getContainerClass: function(recordData) {
+            return '';
+        },
+        getClickableClass: function(){
+            return '';
+        },
+        getDimensionStyle: function(){
+            return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
+        },
+        getPercent: function(values, stateIdx){
+            var total = _.reduce(values[this.field], function(a,b){ return a + b; }, 0),
+                val = 0;
+            if (total > 0){
+                val = Math.round(values[this.field][stateIdx]/total * 100);
+            }
+            return val;
+        },
+        calculateWidth: function (values, stateIdx) {
+
+            if (this.percent){
+                return this.getPercent(values, stateIdx) + '%';
+            }
+            var totals = values && values.totals && values.totals[this.field];
+            if (totals){
+                var total = _.reduce(totals, function(a,b){ return a + b; }, 0),
+                    val = values[this.field] && values[this.field][stateIdx];
+                if (total > 0){
+                    return Math.round(val/total * 100) + '%';
+                }
+            }
+            return 0;
+
+        },
+        getText: function(values, stateIdx){
+            if (this.percent){
+                var pct = this.getPercent(values, stateIdx);
+                if (pct > 0){
+                    return this.getPercent(values, stateIdx) + '%';
+                }
+                return "";
+            }
+            var val = values && values[this.field] && values[this.field][stateIdx];
+            if (this.granularity){
+                val = val/24/7;
+            }
+            return Math.round(val) || "";
+        }
+    },
+
+    constructor: function(config) {
+        var templateConfig = config && config.template || [
+                '<tpl>',
+                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(0)]}; width: {[this.calculateWidth(values,0)]}; ">{[this.getText(values,0)]}</div>',
+                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(1)]}; width: {[this.calculateWidth(values,1)]}; ">{[this.getText(values,1)]}</div>',
+                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(2)]}; width: {[this.calculateWidth(values,2)]}; ">{[this.getText(values,2)]}</div>',
+                '</div>',
+                '</tpl>'
+            ];
+
+        templateConfig.push(this.config);
+        templateConfig.push(config);
+
+        return this.callParent(templateConfig);
+    }
+});
+
+
+
+Ext.define('CArABU.technicalservices.TaskProgressTemplateColumn', {
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.taskprogresscolumn'],
+
+    align: 'right',
+
+    initComponent: function(){
+        var me = this;
+        Ext.QuickTips.init();
+        me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
+            field: me.field,
+            percent: me.percent || false,
+            granularity: me.granularity || null
+        });
+        me.callParent(arguments);
+    },
+    //getValue: function(){
+    //
+    //    if (!values[this.denominatorField]){
+    //        return "--"
+    //    }
+    //    var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
+    //    return remaining/values[this.denominatorField];
+    //},
+    defaultRenderer: function(value, meta, record) {
+
+        var data = Ext.apply({}, record.get('rollup')); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+
+Ext.define('CArABU.technicalservices.TaskRemainingTemplateColumn', {
+    extend: 'Ext.grid.column.Template',
+    alias: ['widget.taskremainingcolumn'],
+
+    align: 'right',
+
+    initComponent: function(){
+        var me = this;
+        Ext.QuickTips.init();
+        me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}">{[this.getContent(values)]}</div></tpl>', {
+
+            getContent: function(values){
+                var todo = values && values.taskToDo && values.taskToDo[0] + values.taskToDo[1];
+                if (todo){
+                    return (todo/24/7).toFixed(1);  //Weeks
+                }
+                return todo;
+            },
+            getTooltip: function (values) {
+
+                var toolTip = "tool tip";
+                return toolTip;
+            }
+        });
+        me.callParent(arguments);
+    },
+    //getValue: function(){
+    //
+    //    if (!values[this.denominatorField]){
+    //        return "--"
+    //    }
+    //    var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
+    //    return remaining/values[this.denominatorField];
+    //},
+    defaultRenderer: function(value, meta, record) {
+        var data = Ext.apply({}, record.get('rollup')); //, record.getAssociatedData());
+        return this.tpl.apply(data);
+    }
+});
+Ext.define('CArABU.technicalservices.Utility',{
+    singleton: true,
+    convertHours: function(value, granularity){
+        return value;
+    }
+});
+
+Ext.define("feature-status-by-task", {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+    items: [
+        {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
+        {xtype:'container',itemId:'grid_box'}
+    ],
+
+    integrationHeaders : {
+        name : "feature-status-by-task"
+    },
+
+    config: {
+        defaultSettings: {
+            portfolioItemType: "PortfolioItem/Feature"
+        }
+    },
+                        
+    launch: function() {
+        this.buildStore();
+    },
+    buildStore: function(){
+        var fetchList = this.getFetchList();
+        Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
+            models: this.getModelNames(),
+            enableHierarchy: false,
+            fetch: fetchList
+        }).then({
+            success: this.buildGrid,
+            scope: this
+        });
+    },
+    buildGrid: function(store){
+
+        store.on('load', this.fetchCalculatedData, this);
+
+        this.getGridBox().add({
+            xtype: 'rallygridboard',
+            context: this.getContext(),
+            modelNames: this.getModelNames(),
+            toggleState: 'grid',
+            stateful: false,
+            stateId: 'grid1',
+            plugins: [
+                this.getFilterPlugin(),
+                this.getFieldPickerPlugin()
+            ],
+            gridConfig: {
+                store: store,
+                stateId: 'treegrid1',
+                stateful: true,
+                enableRanking: false,
+                enableBulkEdit: false,
+                folderSort: false,
+                shouldShowRowActionsColumn: false,
+                columnCfgs: this.getColumnCfgs(),
+                derivedColumns: this.getCalculatedColumns()
+            },
+            height: this.getHeight()
+        });
+
+    },
+    fetchCalculatedData: function(store, node, featureRecords, success){
+        this.logger.log('fetchCalculatedData', featureRecords);
+        //task remaining (weeks)
+        //task estimate weeks by state
+        //% task estimate
+        //# tasks
+        //% # tasks
+        Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords).then({
+            success: this.updateSummary,
+            failure: this.showError,
+            scope: this
+        });
+    },
+    updateSummary: function(totals){
+        this.logger.log('updateSummary', totals);
+
+        var tpl = new Ext.XTemplate('<div class="coverageTitle"><b>{workItemsCoveragePercent} %</b> of work items have test coverage ({workItemsCoverage} / {workItemsTotal})</div>',
+            '<div class="tslegend" style="background-color:#8bbc21;">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;User Stories</div><span class="tslegendspacer">&nbsp;</span></div>',
+            '<div class="tslegend" style="background-color:#c42525">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;Defects</div><span class="tslegendspacer">&nbsp;</span></div>',
+            '<div class="tslegend" style="background-color:#2f7ed8">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;TestSets</div><span class="tslegendspacer">&nbsp;</span></div>',
+            '<div class="tslegend" style="background-color:#ccc">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;No Coverage</div><span class="tslegendspacer">&nbsp;</span></div>'
+
+        );
+
+        header.add({
+            xtype: 'container',
+            itemId: 'ct-summary',
+            tpl: tpl,
+            margin: '0 100 0 75',
+            flex: 1
+
+        });
+
+    },
+    showError: function(msg){
+        this.logger.log('showError', msg);
+        Rally.ui.notify.Notifier.showError({message: msg});
+    },
+    getColumnCfgs: function(){
+        return [{
+            dataIndex: 'FormattedID'
+        },{
+            dataIndex: 'Name',
+            flex: 1
+        }];
+    },
+    getCalculatedColumns: function(){
+        var columns = [{
+            xtype: 'taskremainingcolumn',
+            text: "Task ToDo (wks)",
+            granularity: 'week',
+            field: 'todo'
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "Task Estimate (wks)",
+            granularity: 'week',
+            field: 'taskEstimate'
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "% Task Estimate",
+            field: 'taskEstimate',
+            percent: true
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "# Tasks",
+            field: 'taskCount'
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "% #Tasks",
+            field: 'taskCount',
+            percent: true
+
+        }];
+        return columns;
+    },
+    getFilterPlugin: function(){
+        return {
+            ptype: 'rallygridboardinlinefiltercontrol',
+            inlineFilterButtonConfig: {
+                stateful: true,
+                stateId: this.getContext().getScopedStateId('ctd-filters'),
+                modelNames: this.getModelNames(),
+                inlineFilterPanelConfig: {
+                    quickFilterPanelConfig: {
+                        defaultFields: [
+                            'ArtifactSearch',
+                            'Owner',
+                            'ModelType'
+                        ]
+                    }
+                }
+            }
+        };
+    },
+    getFieldPickerPlugin: function(){
+        return {
+            ptype: 'rallygridboardfieldpicker',
+            headerPosition: 'left',
+            modelNames: this.getModelNames(),
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('ctd-columns-1')
+        };
+    },
+    getModelNames: function(){
+        return [this.getSetting('portfolioItemType')];
+    },
+    getFetchList: function(){
+        return ['ObjectID','FormattedID','UserStories'];
+    },
+    getGridBox: function(){
+        return this.down('#grid_box');
+    },
+    getOptions: function() {
+        return [
+            {
+                text: 'About...',
+                handler: this._launchInfo,
+                scope: this
+            }
+        ];
+    },
+    
+    _launchInfo: function() {
+        if ( this.about_dialog ) { this.about_dialog.destroy(); }
+        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
+    },
+    
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        // Ext.apply(this, settings);
+        this.launch();
+    }
+});
+
+            
+               Rally.launchApp('feature-status-by-task', {
+                   name: 'Feature Status by Task'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+    </style>
+
+</head>
+<body></body>
+</html>
