@@ -49,11 +49,11 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         var snaps = this.tasks || [];
                         this.logger.log('calculateRollups', snaps, taskOwners);
 
-                        if (snaps && snaps.length > 0) {
+                        var taskCount = [0, 0, 0],
+                            taskEstimate = [0, 0, 0],
+                            taskToDo = [0, 0, 0];
 
-                            var taskCount = [0, 0, 0],
-                                taskEstimate = [0, 0, 0],
-                                taskToDo = [0, 0, 0];
+                        if (snaps && snaps.length > 0) {
 
                             for (var i = 0; i < snaps.length; i++) {
                                 var snap = snaps[i],

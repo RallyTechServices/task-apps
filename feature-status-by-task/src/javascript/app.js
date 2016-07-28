@@ -121,14 +121,17 @@ Ext.define("feature-status-by-task", {
     },
     fetchFeatures: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+
+        var featureIDs = this.getFeatureIDs(records);
+
         CArABU.technicalservices.ModelBuilder.build(this.getModelName(), this.getExtendedModelName()).then({
             success: function(model){
                 this.setLoading(true);
-                this.fetchWsapiRecords({
+
+                CArABU.technicalservices.Utility.fetchChunkedWsapiRecords({
                     model: model,
-                    fetch: this.getFeatureFetchList(),
-                    filters: this.getFeatureFilters(records)
-                }).then({
+                    fetch: this.getFeatureFetchList()
+                }, featureIDs).then({
                     success: this.fetchTasks,
                     failure: this.showErrorNotification,
                     scope: this
@@ -311,29 +314,16 @@ Ext.define("feature-status-by-task", {
     getGroupByField: function(){
         return this.down('#cbGroupBy') && this.down('#cbGroupBy').getValue() || null;
     },
-    getFeatureFilters: function(storyRecords){
-        var filters = [],
-            ids = [];
+    getFeatureIDs: function(storyRecords){
+        var ids = [];
         Ext.Array.each(storyRecords, function(s){
             var id = s.get('Feature') && s.get('Feature').ObjectID;
             if (id && !Ext.Array.contains(ids, id)){
                 ids.push(id);
             }
-            if (ids.length > 25){
-                return false;
-            }
         });
-        this.logger.log('getFeatureFilters.Feature ObjectIDs', ids);
-        if (ids.length > 0){
-            var filters = Ext.Array.map(ids, function(id){
-                return {
-                    property: 'ObjectID',
-                    value: id
-                };
-            });
-            return Rally.data.wsapi.Filter.or(filters);
-        }
-        return [];
+        this.logger.log('getFeatureIDs.Feature ObjectIDs', ids);
+        return ids;
     },
     getFeatureFetchList: function(){
         var fetch =  ['ObjectID','FormattedID','Name'];
