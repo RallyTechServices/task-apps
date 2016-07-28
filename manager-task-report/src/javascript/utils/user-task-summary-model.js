@@ -80,9 +80,25 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
             }, this);
         }
 
-        this.ToDo += Ext.Array.sum(Ext.Array.pluck(this.getCurrentTasks(), 'ToDo'));
+        //Don't include ToDo if the state is completed
+        //If Todo > estimate, then estimate = todo
+        var todo = 0;
+        var estimate = 0;
+        Ext.Array.each(this.getCurrentTasks(), function(t){
+            var est = t.Estimate;
+            if (t.State !== 'Completed'){
+                todo += t.ToDo;
+                if (t.ToDo > t.Estimate){
+                    est = t.ToDo;
+                }
+            }
+            estimate += est;
+        });
+
+        this.ToDo += todo;
         this.totalCount += this.getCurrentTasks().length;
-        this.totalEffort += Ext.Array.sum(Ext.Array.pluck(this.getCurrentTasks(), 'Estimate'));
+        this.totalEffort += estimate;
+
         this.numDefined += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "Defined"; }).length;
         this.numInProgress += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "In-Progress"; }).length;
         this.numCompleted += Ext.Array.filter(this.getCurrentTasks(), function(t){ return t.State === "Completed"; }).length;

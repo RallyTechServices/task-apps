@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 28 2016 09:09:40 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 28 2016 09:15:42 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 28 2016 09:09:40 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Jul 28 2016 09:15:42 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 59380733885;
+        var CHECKSUM = 59290114540;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1039,9 +1039,9 @@ Ext.define("feature-status-by-task", {
 
 
         ct.add({
-            xtype: 'rallyiterationcombobox',
+            xtype: 'rallyreleasecombobox',
             margin: 5,
-            fieldLabel: 'Iteration',
+            fieldLabel: 'Release',
             labelAlign: 'right'
         });
 
@@ -1371,12 +1371,12 @@ Ext.define("feature-status-by-task", {
 
     },
     getStoryFilters: function(){
-        var iterationCombo = this.down('rallyiterationcombobox'),
-            iterationFilter = iterationCombo && iterationCombo.getValue() && iterationCombo.getQueryFromSelected() || null,
+        var timeboxCombo = this.down('rallyreleasecombobox'),
+            timeboxFilter = timeboxCombo && timeboxCombo.getValue() && timeboxCombo.getQueryFromSelected() || null,
             milestoneFilter = null,
             milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
 
-        this.logger.log('getStoryFilters',iterationCombo.getValue(), milestones);
+        this.logger.log('getStoryFilters',timeboxCombo.getValue(), milestones);
 
         if (milestones && milestones.length > 0){
             milestoneFilter = Ext.Array.map(milestones, function(m){
@@ -1390,10 +1390,10 @@ Ext.define("feature-status-by-task", {
         }
 
 
-        if (iterationFilter && milestoneFilter){
-            return iterationFilter.and(milestoneFilter);
+        if (timeboxFilter && milestoneFilter){
+            return timeboxFilter.and(milestoneFilter);
         }
-        return iterationFilter || milestoneFilter || null;
+        return timeboxFilter || milestoneFilter || null;
     },
     getTaskOwners: function(){
         var taskOwner = this.down('rallyusercombobox') && this.down('rallyusercombobox').getRecord();

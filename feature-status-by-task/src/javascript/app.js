@@ -64,9 +64,9 @@ Ext.define("feature-status-by-task", {
 
 
         ct.add({
-            xtype: 'rallyiterationcombobox',
+            xtype: 'rallyreleasecombobox',
             margin: 5,
-            fieldLabel: 'Iteration',
+            fieldLabel: 'Release',
             labelAlign: 'right'
         });
 
@@ -396,12 +396,12 @@ Ext.define("feature-status-by-task", {
 
     },
     getStoryFilters: function(){
-        var iterationCombo = this.down('rallyiterationcombobox'),
-            iterationFilter = iterationCombo && iterationCombo.getValue() && iterationCombo.getQueryFromSelected() || null,
+        var timeboxCombo = this.down('rallyreleasecombobox'),
+            timeboxFilter = timeboxCombo && timeboxCombo.getValue() && timeboxCombo.getQueryFromSelected() || null,
             milestoneFilter = null,
             milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
 
-        this.logger.log('getStoryFilters',iterationCombo.getValue(), milestones);
+        this.logger.log('getStoryFilters',timeboxCombo.getValue(), milestones);
 
         if (milestones && milestones.length > 0){
             milestoneFilter = Ext.Array.map(milestones, function(m){
@@ -415,10 +415,10 @@ Ext.define("feature-status-by-task", {
         }
 
 
-        if (iterationFilter && milestoneFilter){
-            return iterationFilter.and(milestoneFilter);
+        if (timeboxFilter && milestoneFilter){
+            return timeboxFilter.and(milestoneFilter);
         }
-        return iterationFilter || milestoneFilter || null;
+        return timeboxFilter || milestoneFilter || null;
     },
     getTaskOwners: function(){
         var taskOwner = this.down('rallyusercombobox') && this.down('rallyusercombobox').getRecord();

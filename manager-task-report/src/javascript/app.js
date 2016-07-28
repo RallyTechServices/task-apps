@@ -25,7 +25,12 @@ Ext.define("manager-task-report", {
     integrationHeaders : {
         name : "manager-task-report"
     },
-                        
+
+    timeboxComboXtype: 'rallyreleasecombobox',
+    timeboxComboLabel: 'Release',
+    timeboxEndDateField: 'ReleaseDate',
+    timeboxStartDateField: 'ReleaseStartDate',
+
     launch: function() {
         this.logger.log('launch')
         this.userManagerStore = Ext.create('CArABU.technicalservices.UserManagerStore',{
@@ -97,13 +102,13 @@ Ext.define("manager-task-report", {
             Rally.ui.notify.Notifier.showError({message: 'Error loading managers.'});
         }
     },
-    _addIterationFilter: function(){
+    _addTimeboxFilter: function(){
         this.down('#manager_box').add({
-            xtype: 'rallyiterationcombobox',
-            fieldLabel: 'Iteration',
+            xtype: this.timeboxComboXtype, // 'rallyiterationcombobox',
+            fieldLabel: this.timeboxComboLabel, //'Iteration',
             labelAlign: 'right',
             stateful: true,
-            stateId: this.getContext().getScopedStateId('iteration-picker'),
+            stateId: this.getContext().getScopedStateId('timebox-picker'),
             margin: 10
         });
     },
@@ -147,7 +152,7 @@ Ext.define("manager-task-report", {
         this.down('#manager_box').removeAll();
 
 
-        this._addIterationFilter();
+        this._addTimeboxFilter();
         this._addManagerFilters();
         this._addMilestonePicker();
 
@@ -171,18 +176,18 @@ Ext.define("manager-task-report", {
     getSelectedManagerId: function(){
         return this.down('rallyusercombobox') && this.down('rallyusercombobox').getValue() || null;
     },
-    getSelectedIterationFilter: function(){
-        var iterationRecord = this.down('rallyiterationcombobox') && this.down('rallyiterationcombobox').getRecord();
-        if (iterationRecord){
+    getSelectedTimeboxFilter: function(){
+        var timeboxRecord = this.down(this.timeboxComboXtype) && this.down(this.timeboxComboXtype).getRecord();
+        if (timeboxRecord){
             return Rally.data.wsapi.Filter.and([{
-                property: 'WorkProduct.Iteration.Name',
-                value: iterationRecord.get('Name')
+                property: 'WorkProduct.' + this.timeboxComboLabel + '.Name',
+                value: timeboxRecord.get('Name')
             },{
-                property: 'WorkProduct.Iteration.StartDate',
-                value: iterationRecord.get('StartDate')
+                property: 'WorkProduct.' + this.timeboxComboLabel + '.' + this.timeboxStartDateField,
+                value: timeboxRecord.get(this.timeboxStartDateField)
             },{
-                property: 'WorkProduct.Iteration.EndDate',
-                value: iterationRecord.get('EndDate')
+                property: 'WorkProduct.' + this.timeboxComboLabel + '.' + this.timeboxEndDateField,
+                value: timeboxRecord.get(this.timeboxEndDateField)
             }]);
         }
         return null;
@@ -229,10 +234,10 @@ Ext.define("manager-task-report", {
         }
 
         filters = Rally.data.wsapi.Filter.or(filters);
-        var iterationFilter = this.getSelectedIterationFilter();
-        if (iterationFilter){
-            this.logger.log('iterationFilter', iterationFilter.toString());
-            filters = filters.and(iterationFilter);
+        var timeboxFilter = this.getSelectedTimeboxFilter();
+        if (timeboxFilter){
+            this.logger.log('timeboxFilter', timeboxFilter.toString());
+            filters = filters.and(timeboxFilter);
 
         }
 
@@ -286,7 +291,7 @@ Ext.define("manager-task-report", {
             this.setLoading(false);
             this.down('#display_box').add({
                 xtype: 'container',
-                html: '<div class="no-data-container"><div class="secondary-message">No tasks were found in the currently selected Iteration and Milestone(s) for the currently selected manager.</div></div>'
+                html: '<div class="no-data-container"><div class="secondary-message">No tasks were found in the currently selected ' + this.timeboxComboLabel + ' and Milestone(s) for the currently selected manager.</div></div>'
             });
             return;
         }
