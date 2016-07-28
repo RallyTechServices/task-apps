@@ -480,7 +480,8 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'taskprogresscolumn',
             text: "% Task Estimate",
-            dataIndex: '__taskEstimate'
+            dataIndex: '__taskEstimate',
+            sortable: false
         },{
             xtype: 'taskprogresscolumn',
             dataIndex: '__taskCount',
@@ -489,7 +490,8 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'taskprogresscolumn',
             text: "% #Tasks",
-            dataIndex: '__taskCount'
+            dataIndex: '__taskCount',
+            sortable: false 
 
         }];
 

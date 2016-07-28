@@ -10,29 +10,23 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                 var default_fields = [{
                     name: '__taskToDo',
-                    defaultValue: [0,0,0]
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
                 },{
                     name: '__taskEstimate',
-                    defaultValue: [0,0,0]
-                },{
-                    name: '__pctTaskEstimate',
-                    defaultValue: [0,0,0]
-                },{
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
+                 },{
                     name: '__taskCount',
-                    defaultValue: [0,0,0]
-                }, {
-                    name: '__pctTaskCount',
-                    defaultValue: [0,0,0]
-                }, {
-                    name: '__totalCount',
-                    defaultValue: -1
-                }, {
-                    name: '__totalEstimate',
-                    defaultValue: -1
-                },{
-                    name: '__totalToDo',
-                    defaultValue: -1
-                }];
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
+               }];
 
                 var new_model = Ext.define(newModelName, {
                     extend: model,

@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 28 2016 10:05:50 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 28 2016 11:19:52 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 28 2016 10:05:50 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Jul 28 2016 11:19:52 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 62691452105;
+        var CHECKSUM = 62650739708;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -556,29 +556,23 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                 var default_fields = [{
                     name: '__taskToDo',
-                    defaultValue: [0,0,0]
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
                 },{
                     name: '__taskEstimate',
-                    defaultValue: [0,0,0]
-                },{
-                    name: '__pctTaskEstimate',
-                    defaultValue: [0,0,0]
-                },{
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
+                 },{
                     name: '__taskCount',
-                    defaultValue: [0,0,0]
-                }, {
-                    name: '__pctTaskCount',
-                    defaultValue: [0,0,0]
-                }, {
-                    name: '__totalCount',
-                    defaultValue: -1
-                }, {
-                    name: '__totalEstimate',
-                    defaultValue: -1
-                },{
-                    name: '__totalToDo',
-                    defaultValue: -1
-                }];
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return Ext.Array.sum(value);
+                    }
+               }];
 
                 var new_model = Ext.define(newModelName, {
                     extend: model,
@@ -1497,7 +1491,8 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'taskprogresscolumn',
             text: "% Task Estimate",
-            dataIndex: '__taskEstimate'
+            dataIndex: '__taskEstimate',
+            sortable: false
         },{
             xtype: 'taskprogresscolumn',
             dataIndex: '__taskCount',
@@ -1506,7 +1501,8 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'taskprogresscolumn',
             text: "% #Tasks",
-            dataIndex: '__taskCount'
+            dataIndex: '__taskCount',
+            sortable: false 
 
         }];
 
