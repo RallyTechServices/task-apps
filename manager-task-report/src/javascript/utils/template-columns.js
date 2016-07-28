@@ -81,6 +81,10 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
 
             var denominator = recordData["Estimate"] || 0,
                 numerator = recordData["ToDo"] || 0;
+            //If todo is greater than estimte, then the estimate = todo.
+            if (numerator > denominator){
+                denominator = numerator;
+            }
 
             var percentDone = denominator ? (denominator - numerator)/denominator : 0;
             return Math.round(percentDone * 100);
@@ -100,7 +104,7 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
         },
         getDangerTooltip: function(recordData){
             if (!recordData["Estimate"]){
-                return "No Estimate on Task.";
+                return "No Estimate on Task.  Using ToDo if its present.";
             }
             return "";
         }

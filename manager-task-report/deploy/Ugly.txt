@@ -3,10 +3,10 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 21 2016 09:51:37 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 28 2016 09:45:14 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 21 2016 09:51:37 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Jul 28 2016 09:45:14 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
