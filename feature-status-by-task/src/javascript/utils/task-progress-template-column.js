@@ -16,6 +16,9 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
     config: {
 
         calculateColorFn: function(stateIdx){
+            if (this.field === '__taskToDo'){
+                return '#808080';
+            }
             var colors = ['#FF8200','#7CAFD7','#8DC63F'];
             return colors[stateIdx];
         },
@@ -29,42 +32,53 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
         },
         getPercent: function(values, stateIdx){
-            var total = _.reduce(values[this.field], function(a,b){ return a + b; }, 0),
-                val = 0;
-            if (total > 0){
-                val = Math.round(values[this.field][stateIdx]/total * 100);
+            var val = 0;
+            var total =  Ext.Array.sum(values[this.field]),
+                numerator = values[this.field][stateIdx];
+
+            if (total > 0 && numerator){
+                val = (numerator/total * 100);
             }
             return val;
         },
         calculateWidth: function (values, stateIdx) {
-
-            if (this.percent){
+            if (!this.total){
                 return this.getPercent(values, stateIdx) + '%';
             }
-            var totals = values && values.totals && values.totals[this.field];
-            if (totals){
-                var total = _.reduce(totals, function(a,b){ return a + b; }, 0),
-                    val = values[this.field] && values[this.field][stateIdx];
-                if (total > 0){
-                    return Math.round(val/total * 100) + '%';
-                }
+
+            var total =  this.total,
+                numerator = values[this.field][stateIdx];
+
+            if (total > 0 && numerator){
+                console.log('calculateWidth', values.FormattedID, stateIdx, Math.floor(numerator/total * 100));
+                return (numerator/total * 100) + '%';
             }
-            return 0;
+            return 0
 
         },
         getText: function(values, stateIdx){
-            if (this.percent){
+
+            if (!this.total){
                 var pct = this.getPercent(values, stateIdx);
-                if (pct > 0){
-                    return this.getPercent(values, stateIdx) + '%';
+                return pct > 0 ? Math.round(pct) + '%' : "";
+            }
+
+            var val = values && values[this.field] && values[this.field][stateIdx] || 0;
+
+            if (val){
+                if (this.granularityDivider){
+                    val = val/this.granularityDivider; //convert to weeks
                 }
-                return "";
+                if (this.field === '__taskToDo'){
+                    return val.toFixed(1);
+                }
+                if (val < 1 && val > 0){
+                    return val.toFixed(3);
+                }
+                return Math.round(val) || "";
             }
-            var val = values && values[this.field] && values[this.field][stateIdx];
-            if (this.granularity){
-                val = val/24/7;
-            }
-            return Math.round(val) || "";
+            return "";
+
         }
     },
 
@@ -98,23 +112,15 @@ Ext.define('CArABU.technicalservices.TaskProgressTemplateColumn', {
         var me = this;
         Ext.QuickTips.init();
         me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
-            field: me.field,
-            percent: me.percent || false,
-            granularity: me.granularity || null
+            field: me.dataIndex,
+            total: me.total,
+            granularityDivider: me.granularityDivider
         });
         me.callParent(arguments);
     },
-    //getValue: function(){
-    //
-    //    if (!values[this.denominatorField]){
-    //        return "--"
-    //    }
-    //    var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
-    //    return remaining/values[this.denominatorField];
-    //},
     defaultRenderer: function(value, meta, record) {
 
-        var data = Ext.apply({}, record.get('rollup')); //, record.getAssociatedData());
+        var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }
 });

@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 21 2016 08:41:36 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Jul 28 2016 09:09:40 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 21 2016 08:41:36 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Jul 28 2016 09:09:40 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 16494867281;
+        var CHECKSUM = 59380733885;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -208,35 +208,129 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     MAX_CHUNK_SIZE: 25,
     TASK_STATES: ['Defined','In-Progress','Completed'],
 
-    load: function(records){
+    loadTasks: function(records){
         var deferred = Ext.create('Deft.Deferred');
 
-        var objectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        this.logger.log('CArABU.technicalservices.loadTasks.load objectIDs', featureObjectIDs);
+        this.fetchTaskChunks(featureObjectIDs).then({
+            success: function(taskRecords){
+                this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
+                var snapsByOid = this._getSnapsByOid(taskRecords, featureObjectIDs);
 
-        this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
-        var promises = [];
-        for (var i=0; i < objectIDs.length; i = i+this.MAX_CHUNK_SIZE){
-            var chunk = Ext.Array.slice(objectIDs, i, i + this.MAX_CHUNK_SIZE);
-            promises.push(this._fetchLBAPIChunk(chunk));
-        }
-
-        Deft.Promise.all(promises).then({
-            success: function(results){
-                this.logger.log('load Success', results);
-                var totals = this._calculateTaskRollups(_.flatten(results), records, objectIDs);
-
-                deferred.resolve(totals);
+                for (var i=0; i < records.length; i++){
+                    records[i].addTasks(snapsByOid[records[i].get('ObjectID') || [] ]);
+                }
+                deferred.resolve(records);
             },
             failure: function(msg){
-                this.logger.log('load Failure', msg);
+                this.logger.log('load.fetchTaskChunks FAILURE', msg);
+                deferred.reject(msg);
             },
             scope: this
         });
-
         return deferred;
-
     },
-    _calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
+
+    load: function(records, storyFilters, taskOwners){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        if (storyFilters){
+            this.fetchStories(featureObjectIDs, storyFilters).then({
+                success: function(storyIDs){
+                    this.logger.log('load Stories Success', storyIDs);
+                    this.fetchTaskChunks(storyIDs, taskOwners).then({
+                        success: function(taskRecords){
+                            this.logger.log('load.fetchStories.fetchTaskChunks SUCCESS', taskRecords);
+                            var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
+                            deferred.resolve(totals);
+                        },
+                        failure: function(msg){
+                            this.logger.log('load.fetchStories.fetchTaskChunks FAILURE', msg);
+                            deferred.reject(msg);
+                        },
+                        scope: this
+                    });
+                },
+                failure: function(msg){
+                    this.logger.log('load.fetchStories FAILURE', msg);
+                    deferred.reject(msg);
+                },
+                scope: this
+            });
+        } else {
+            this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
+            this.fetchTaskChunks(featureObjectIDs, taskOwners).then({
+                success: function(taskRecords){
+                    this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
+                    var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
+                    deferred.resolve(totals);
+                },
+                failure: function(msg){
+                    this.logger.log('load.fetchTaskChunks FAILURE', msg);
+                    deferred.reject(msg);
+                },
+                scope: this
+            });
+        }
+        return deferred;
+    },
+    fetchTaskChunks: function(ancestorObjectIDs, taskOwners){
+        var deferred = Ext.create('Deft.Deferred');
+        var promises = [];
+        for (var i=0; i < ancestorObjectIDs.length; i = i+this.MAX_CHUNK_SIZE){
+            var chunk = Ext.Array.slice(ancestorObjectIDs, i, i + this.MAX_CHUNK_SIZE);
+            promises.push(this._fetchLBAPIChunk(chunk, taskOwners));
+        }
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                var records = _.flatten(results);
+                this.logger.log('fetchTaskChunks SUCCESS results', results,records);
+                deferred.resolve(records);
+            },
+            failure: function(msg){
+                this.logger.log('fetchTaskChunks FAILURE', ancestorObjectIDs, taskOwners, msg);
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+        return deferred;
+    },
+    fetchStories: function(featureObjectIDs, filters){
+        var deferred = Ext.create('Deft.Deferred');
+        //we are only interested in stories that have features
+        filters = filters.and({
+            property: 'Feature.ObjectID',
+            operator: '>',
+            value: 0
+        });
+
+        Ext.create('Rally.data.wsapi.Store',{
+            model: 'HierarchicalRequirement',
+            fetch: ['ObjectID','Feature'],
+            filters: filters,
+            limit: 'Infinity'
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    //we only want stories associated with the features that we passed in so we will filter those out.
+                    var storyIds = [];
+                    for (var i=0; i<records.length; i++){
+                        var featureID = records[i].get('Feature') && records[i].get('Feature').ObjectID;
+                        if (Ext.Array.contains(featureObjectIDs, featureID)){
+                            storyIds.push(records[i].get('ObjectID'));
+                        }
+                    }
+                    deferred.resolve(storyIds);
+                } else {
+                    deferred.reject("Error fetching stories: " + operation && operation.error && operation.error.errors.join(','));
+                }
+            }
+        });
+        return deferred;
+    },
+    calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
         this.logger.log('_calculateTaskRollups', taskRecords, featureRecords);
 
         var snapsByOid = this._getSnapsByOid(taskRecords, objectIDs),
@@ -343,37 +437,51 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
 
     },
     _getSnapsByOid: function(snapshots, featureObjectIDs){
-        var hash = {};
+
+         var hash = {};
         for (var i=0; i< snapshots.length; i++){
+
+            var snap = snapshots[i].getData();
             var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
                 objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
 
             if (!hash[objectID]){
                 hash[objectID] = [];
             }
-            hash[objectID].push(snapshots[i].getData());
+            hash[objectID].push(snap);
         }
         return hash;
     },
-    _fetchLBAPIChunk: function(objectIDs){
+    _fetchLBAPIChunk: function(objectIDs, taskOwners){
         var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_fetchLBAPIChunk', objectIDs, taskOwners);
+
+        var filters = [
+            {
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: objectIDs
+            },{
+                property: '_TypeHierarchy',
+                value: 'Task'
+            },{
+                property: '__At',
+                value: "current"
+            }
+
+        ];
+
+        if (taskOwners && taskOwners.length > 0){
+            filters.push({
+                property: 'Owner',
+                operator: 'in',
+                value: taskOwners
+            });
+        }
 
         Ext.create('Rally.data.lookback.SnapshotStore',{
             fetch: this._getLBAPIFetchList(),
-            filters: [
-                {
-                    property: '_ItemHierarchy',
-                    operator: 'in',
-                    value: objectIDs
-                },{
-                    property: '_TypeHierarchy',
-                    value: 'Task'
-                },{
-                    property: '__At',
-                    value: "current"
-                }
-
-            ],
+            filters: filters,
             hydrate: ['State'],
             sorters: [{
                 property: 'ObjectID',
@@ -384,12 +492,15 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         }).load({
             callback: function(records, operation, success){
                 if (success){
+                    this.logger.log('_fetchLBAPIChunk SUCCESS', records);
                     deferred.resolve(records);
                 } else {
                     var msg = "Failure loading snapshots for objectIDs: " + objectIDs.join(', ') + ":  " + operation.error.errors.join(',');
+                    this.logger.log('_fetchLBAPIChunk FAILURE', msg);
                     deferred.resolve(msg);
                 }
-            }
+            },
+            scope: this
         });
         return deferred;
     },
@@ -433,6 +544,143 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     }
 
 });
+Ext.define('CArABU.technicalservices.ModelBuilder',{
+    singleton: true,
+
+    build: function(modelType, newModelName) {
+        var deferred = Ext.create('Deft.Deferred');
+
+        Rally.data.ModelFactory.getModel({
+            type: modelType,
+            success: function(model) {
+
+                var default_fields = [{
+                    name: '__taskToDo',
+                    defaultValue: [0,0,0]
+                },{
+                    name: '__taskEstimate',
+                    defaultValue: [0,0,0]
+                },{
+                    name: '__pctTaskEstimate',
+                    defaultValue: [0,0,0]
+                },{
+                    name: '__taskCount',
+                    defaultValue: [0,0,0]
+                }, {
+                    name: '__pctTaskCount',
+                    defaultValue: [0,0,0]
+                }, {
+                    name: '__totalCount',
+                    defaultValue: -1
+                }, {
+                    name: '__totalEstimate',
+                    defaultValue: -1
+                },{
+                    name: '__totalToDo',
+                    defaultValue: -1
+                }];
+
+                var new_model = Ext.define(newModelName, {
+                    extend: model,
+                    logger: new Rally.technicalservices.Logger(),
+                    fields: default_fields,
+                    snaps: undefined,
+
+                    addTasks: function(snaps){
+                        this.logger.log('addTasks', snaps);
+                        this.tasks = snaps || [];
+                    },
+                    calculateRollups: function(taskOwners) {
+                        var TASK_STATES = ['Defined','In-Progress','Completed'];
+                        var snaps = this.tasks || [];
+                        this.logger.log('calculateRollups', snaps, taskOwners);
+
+                        if (snaps && snaps.length > 0) {
+
+                            var taskCount = [0, 0, 0],
+                                taskEstimate = [0, 0, 0],
+                                taskToDo = [0, 0, 0];
+
+                            for (var i = 0; i < snaps.length; i++) {
+                                var snap = snaps[i],
+                                    state = snap.State,
+                                    stateIdx = _.indexOf(TASK_STATES, state),
+                                    includeTask = true;
+
+                                if (taskOwners && taskOwners.length > 0){
+                                    includeTask = Ext.Array.contains(taskOwners, snap.Owner);
+                                }
+
+                                if (includeTask){
+                                    taskCount[stateIdx]++;
+                                    var est = snap.Estimate || 0;
+                                    if (stateIdx < 2){
+                                        est = Math.max(est, snap.ToDo || 0);
+                                        taskToDo[stateIdx] += (snap.ToDo || 0);
+                                    }
+                                    taskEstimate[stateIdx] += est;
+                                }
+                            }
+                        }
+                        this.logger.log('calculateRollups', this.get('FormattedID'), taskCount, taskEstimate, taskToDo);
+
+                        this.set('__taskToDo', taskToDo);
+                        this.set('__taskEstimate', taskEstimate);
+                        this.set('__taskCount', taskCount);
+
+                        return { todo: taskToDo, count: taskCount, estimate: taskEstimate };
+
+                        //'__pctTaskEstimate'
+                        //'__pctTaskCount'
+                    },
+                    //updateTotals: function(totalToDo, totalCount, totalEstimate){
+                    //    this.set('__totalToDo', totalToDo);
+                    //    this.set('__totalEstimate', totalEstimate);
+                    //    this.set('__totalCount', totalCount);
+                    //}
+                });
+                deferred.resolve(new_model);
+            }
+        });
+        return deferred;
+    },
+
+    // sometimes, dates are provided as beginning of day, but we 
+    // want to go to the end of the day
+    shiftToEndOfDay: function(js_date) {
+        return Rally.util.DateTime.add(Rally.util.DateTime.add(js_date,'day',1),'second',-1);
+    },
+
+    isAccepted: function(state) {
+        return ( state == 'Accepted' );
+    }
+});
+Ext.override(Rally.ui.gridboard.plugin.GridBoardFieldPicker, {
+    gridFieldBlackList: [
+        'Actuals',
+        'Changesets',
+        'Children',
+        // 'Description',
+        // 'Notes',
+        'ObjectID',
+        'Predecessors',
+        'RevisionHistory',
+        'Subscription',
+        'Successors',
+        'TaskIndex',
+        'Workspace',
+        'VersionId'
+    ]
+});
+
+Ext.override(Rally.ui.inlinefilter.PropertyFieldComboBox, {
+    /**
+     * @cfg {String[]} whiteListFields
+     * field names that should be included from the filter row field combobox
+     */
+    defaultWhiteListFields: ['Milestones']
+});
+
 Ext.override(Rally.ui.grid.TreeGrid, {
     _mergeColumnConfigs: function(newColumns, oldColumns) {
 
@@ -500,6 +748,9 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
     config: {
 
         calculateColorFn: function(stateIdx){
+            if (this.field === '__taskToDo'){
+                return '#808080';
+            }
             var colors = ['#FF8200','#7CAFD7','#8DC63F'];
             return colors[stateIdx];
         },
@@ -513,42 +764,53 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
         },
         getPercent: function(values, stateIdx){
-            var total = _.reduce(values[this.field], function(a,b){ return a + b; }, 0),
-                val = 0;
-            if (total > 0){
-                val = Math.round(values[this.field][stateIdx]/total * 100);
+            var val = 0;
+            var total =  Ext.Array.sum(values[this.field]),
+                numerator = values[this.field][stateIdx];
+
+            if (total > 0 && numerator){
+                val = (numerator/total * 100);
             }
             return val;
         },
         calculateWidth: function (values, stateIdx) {
-
-            if (this.percent){
+            if (!this.total){
                 return this.getPercent(values, stateIdx) + '%';
             }
-            var totals = values && values.totals && values.totals[this.field];
-            if (totals){
-                var total = _.reduce(totals, function(a,b){ return a + b; }, 0),
-                    val = values[this.field] && values[this.field][stateIdx];
-                if (total > 0){
-                    return Math.round(val/total * 100) + '%';
-                }
+
+            var total =  this.total,
+                numerator = values[this.field][stateIdx];
+
+            if (total > 0 && numerator){
+                console.log('calculateWidth', values.FormattedID, stateIdx, Math.floor(numerator/total * 100));
+                return (numerator/total * 100) + '%';
             }
-            return 0;
+            return 0
 
         },
         getText: function(values, stateIdx){
-            if (this.percent){
+
+            if (!this.total){
                 var pct = this.getPercent(values, stateIdx);
-                if (pct > 0){
-                    return this.getPercent(values, stateIdx) + '%';
+                return pct > 0 ? Math.round(pct) + '%' : "";
+            }
+
+            var val = values && values[this.field] && values[this.field][stateIdx] || 0;
+
+            if (val){
+                if (this.granularityDivider){
+                    val = val/this.granularityDivider; //convert to weeks
                 }
-                return "";
+                if (this.field === '__taskToDo'){
+                    return val.toFixed(1);
+                }
+                if (val < 1 && val > 0){
+                    return val.toFixed(3);
+                }
+                return Math.round(val) || "";
             }
-            var val = values && values[this.field] && values[this.field][stateIdx];
-            if (this.granularity){
-                val = val/24/7;
-            }
-            return Math.round(val) || "";
+            return "";
+
         }
     },
 
@@ -582,66 +844,128 @@ Ext.define('CArABU.technicalservices.TaskProgressTemplateColumn', {
         var me = this;
         Ext.QuickTips.init();
         me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
-            field: me.field,
-            percent: me.percent || false,
-            granularity: me.granularity || null
+            field: me.dataIndex,
+            total: me.total,
+            granularityDivider: me.granularityDivider
         });
         me.callParent(arguments);
     },
-    //getValue: function(){
-    //
-    //    if (!values[this.denominatorField]){
-    //        return "--"
-    //    }
-    //    var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
-    //    return remaining/values[this.denominatorField];
-    //},
     defaultRenderer: function(value, meta, record) {
 
-        var data = Ext.apply({}, record.get('rollup')); //, record.getAssociatedData());
+        var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }
 });
 
-Ext.define('CArABU.technicalservices.TaskRemainingTemplateColumn', {
+
+Ext.define('CArABU.technicalservices.TaskToDoTemplate',{
+    extend: 'Ext.XTemplate',
+
+    /**
+     * @cfg {String}
+     * define a width if necessary to fit where it's being used
+     */
+    width: '100%',
+    /**
+     * @cfg {String}
+     * define a height if necessary to fit where it's being used
+     */
+    height: '20px',
+
+    config: {
+
+        calculateColorFn: function(stateIdx){
+           return '#808080';
+        },
+        getContainerClass: function(recordData) {
+            return '';
+        },
+        getClickableClass: function(){
+            return '';
+        },
+        getDimensionStyle: function(){
+            return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
+        },
+        calculateWidth: function (values) {
+            var total =  this.total,
+                numerator = values[this.field][0] + values[this.field][1];
+            if (total > 0 && numerator){
+                return Math.floor(numerator/total * 100);
+            }
+            return 0
+
+        },
+        calculateRemainingWidth: function(values){
+            return 100 - this.calculateWidth(values);
+        },
+
+        getText: function(values, idx){
+            var width = this.calculateWidth(values);
+
+            var val = values[this.field][0] + values[this.field][1];
+            if (val){
+                if (this.granularityDivider){
+                    val = val/this.granularityDivider; //convert to weeks
+                }
+                if (val < 1 && val > 0){
+                    val = val.toFixed(2);
+                } else {
+                    val = Math.round(val);
+                }
+            }
+
+            if (width > 75 && idx === 0){
+                return val + "&nbsp;";
+            }
+            if (width < 75 && idx > 0){
+                return "&nbsp;" + val;
+            }
+            return "";
+        }
+    },
+
+    constructor: function(config) {
+        var templateConfig = config && config.template || [
+                '<tpl>',
+                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div class="rly-progress-bar" style="text-align:right;color:#e6e6e6;background-color: {[this.calculateColorFn()]}; width: {[this.calculateWidth(values)]}%; ">{[this.getText(values,0)]}</div>',
+                '<div class="rly-progress-bar" style="text-align:left;background-color:#e6e6e6; width:{[this.calculateRemainingWidth(values)]}%; ">{[this.getText(values,1)]}</div>',
+//                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn()]}; width:0; "></div>',
+                '</div>',
+                '</tpl>'
+            ];
+
+        templateConfig.push(this.config);
+        templateConfig.push(config);
+
+        return this.callParent(templateConfig);
+    }
+});
+
+
+
+Ext.define('CArABU.technicalservices.TaskToDoTemplateColumn', {
     extend: 'Ext.grid.column.Template',
-    alias: ['widget.taskremainingcolumn'],
+    alias: ['widget.tasktodocolumn'],
 
     align: 'right',
 
     initComponent: function(){
         var me = this;
         Ext.QuickTips.init();
-        me.tpl = new Ext.XTemplate('<tpl><div data-qtip="{[this.getTooltip(values)]}">{[this.getContent(values)]}</div></tpl>', {
-
-            getContent: function(values){
-                var todo = values && values.taskToDo && values.taskToDo[0] + values.taskToDo[1];
-                if (todo){
-                    return (todo/24/7).toFixed(1);  //Weeks
-                }
-                return todo;
-            },
-            getTooltip: function (values) {
-
-                var toolTip = "tool tip";
-                return toolTip;
-            }
+        me.tpl = Ext.create('CArABU.technicalservices.TaskToDoTemplate',{
+            total: me.total,
+            granularityDivider: me.granularityDivider,
+            field: me.dataIndex
         });
         me.callParent(arguments);
     },
-    //getValue: function(){
-    //
-    //    if (!values[this.denominatorField]){
-    //        return "--"
-    //    }
-    //    var remaining = values[this.denominatorField] - (values[this.numeratorField] || 0);
-    //    return remaining/values[this.denominatorField];
-    //},
     defaultRenderer: function(value, meta, record) {
-        var data = Ext.apply({}, record.get('rollup')); //, record.getAssociatedData());
+        var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }
 });
+
 Ext.define('CArABU.technicalservices.Utility',{
     singleton: true,
     convertHours: function(value, granularity){
@@ -656,6 +980,8 @@ Ext.define("feature-status-by-task", {
     defaults: { margin: 10 },
     items: [
         {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
+        {xtype:'container',itemId:'filter_box', layout: 'hbox'},
+        {xtype:'container',itemId:'summary_box', layout: 'hbox', padding: 25},
         {xtype:'container',itemId:'grid_box'}
     ],
 
@@ -668,20 +994,349 @@ Ext.define("feature-status-by-task", {
             portfolioItemType: "PortfolioItem/Feature"
         }
     },
+    groupByFields: ['c_PMTMaster','c_PMTMasterName'],
+    groupByModel: "PortfolioItem/Feature",
                         
     launch: function() {
-        this.buildStore();
+        this.addStoryFilters();
+        //this.buildStore();
     },
-    buildStore: function(){
-        var fetchList = this.getFetchList();
-        Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
-            models: this.getModelNames(),
-            enableHierarchy: false,
-            fetch: fetchList
+    //buildStore: function(){
+    //    this.getGridBox().removeAll();
+    //    var fetchList = this.getFeatureFetchList();
+    //    Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
+    //        models: this.getModelName(),
+    //        enableHierarchy: false,
+    //        fetch: fetchList
+    //    }).then({
+    //        success: this.buildGrid,
+    //        scope: this
+    //    });
+    //
+    //},
+    addStoryFilters: function(){
+        this.logger.log('addStoryFilters');
+
+        var ct = this.down('#filter_box');
+        ct.removeAll();
+
+        var groupByFields = this.groupByFields;
+        ct.add({
+            xtype: 'rallyfieldcombobox',
+            fieldLabel: 'Group by',
+            labelAlign: 'right',
+            itemId: 'cbGroupBy',
+            margin: 5,
+            allowNoEntry: true,
+            model: this.getModelName(),
+            _isNotHidden: function(field){
+                if (Ext.Array.contains(groupByFields, field.name)){
+                    return true;
+                }
+                return false;
+            }
+        });
+
+
+        ct.add({
+            xtype: 'rallyiterationcombobox',
+            margin: 5,
+            fieldLabel: 'Iteration',
+            labelAlign: 'right'
+        });
+
+        ct.add({
+            xtype: 'rallymilestonepicker',
+            margin: 5,
+            fieldLabel: 'Story Milestones',
+            labelAlign: 'right'
+        });
+
+        ct.add({
+            xtype: 'rallyusercombobox',
+            margin: 5,
+            fieldLabel: 'Task Owner',
+            labelAlign: 'right'
+        });
+
+        ct.add({
+            xtype: 'rallybutton',
+            margin: 5,
+            text: 'Go',
+            listeners: {
+                click: this.updateView,
+                scope: this
+            }
+        });
+
+    },
+    getExtendedModelName: function(){
+        return "FeatureStatusModel";
+    },
+    getSummaryBox: function(){
+        return this.down('#summary_box');
+    },
+    updateView: function(){
+        this.logger.log('updateView');
+        //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+        this.getGridBox().removeAll();
+        this.getSummaryBox().removeAll();
+
+        //First, we need to get the feature IDs of interest
+        this.fetchWsapiRecords({
+            model: 'HierarchicalRequirement',
+            fetch: ['Feature','ObjectID'],
+            filters: this.getStoryFilters(),
+            limit: 'Infinity'
         }).then({
-            success: this.buildGrid,
+            success: this.fetchFeatures,
+            failure: this.showErrorNotification,
             scope: this
         });
+    },
+    fetchFeatures: function(records){
+        //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+        CArABU.technicalservices.ModelBuilder.build(this.getModelName(), this.getExtendedModelName()).then({
+            success: function(model){
+                this.setLoading(true);
+                this.fetchWsapiRecords({
+                    model: model,
+                    fetch: this.getFeatureFetchList(),
+                    filters: this.getFeatureFilters(records)
+                }).then({
+                    success: this.fetchTasks,
+                    failure: this.showErrorNotification,
+                    scope: this
+                }).always( function(){ this.setLoading(false);}, this);
+            },
+            failure: this.showErrorNotification,
+            scope: this
+        });
+    },
+    fetchTasks: function(records){
+        //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+        this.logger.log('fetchTasks', records.length);
+        if (!records || records.length === 0){
+            this.setLoading(false);
+            this.down('#display_box').add({
+                xtype: 'container',
+                html: '<div class="no-data-container"><div class="secondary-message">No Features were found for the currently selected filters and project.</div></div>'
+            });
+            return;
+        }
+
+        Ext.create('CArABU.technicalservices.FeatureTaskStore').loadTasks(records).then({
+            success: this.refineRecords,
+            failure: this.showErrorNotification,
+            scope: this
+        });
+    },
+    refineRecords: function(records){
+        //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+        //this function takes the feature records with the tasks on them and refines them accoring to the filters.
+        var maxToDo = 0,
+            maxEstimate = 0,
+            maxCount = 0,
+            totalToDo = [0,0,0],
+            totalCount = [0,0,0],
+            totalEstimate = [0,0,0],
+            taskOwners = this.getTaskOwners();
+
+        Ext.Array.each(records, function(r){
+            var resultsHash = r.calculateRollups(taskOwners);
+            maxToDo = Math.max(maxToDo, Ext.Array.sum(resultsHash.todo));
+            maxEstimate = Math.max(maxEstimate, Ext.Array.sum(resultsHash.estimate));
+            maxCount = Math.max(maxCount, Ext.Array.sum(resultsHash.count));
+
+            for (var i = 0; i < 3; i++){
+                totalToDo[i] += resultsHash.todo[i];
+                totalCount[i] += resultsHash.count[i];
+                totalEstimate[i] += resultsHash.estimate[i];
+            }
+        });
+        this.logger.log('refineRecords', totalToDo, totalEstimate, totalCount);
+
+        this.buildSummaryBar(records.length, totalToDo, totalEstimate, totalCount);
+        this.buildTreeGrid(records, maxToDo, maxEstimate, maxCount);
+    },
+    buildSummaryBar: function(totalFeatures, totalToDo, totalEstimate, totalCount) {
+        this.logger.log('buildSummaryBar', totalFeatures, totalToDo, totalEstimate, totalCount);
+
+        var colorData = [{
+            color: '#FF8200',
+            label: 'Defined'
+        },{
+            color: '#7CAFD7',
+            label: 'In-Progress'
+        },{
+            color: '#8DC63F',
+            label: 'Completed'
+        }];
+
+        var maxToDo = Math.max(totalEstimate[0] + totalEstimate[1], Ext.Array.sum(totalToDo)),
+            maxEstimate = Ext.Array.sum(totalEstimate),
+            maxCount = Ext.Array.sum(totalCount);
+        this.logger.log('buildSummaryBar', maxToDo, maxEstimate, maxCount);
+        this.getSummaryBox().add({
+            xtype: 'rallygrid',
+            itemId: 'summary-grid',
+            store: Ext.create('Rally.data.custom.Store',{
+                data: [{
+                    legend: colorData,
+                    totalCount: totalFeatures,
+                    totalTaskToDo: totalToDo,
+                    totalTaskEstimate: totalEstimate,
+                    totalTaskCount: totalCount
+                }]
+            }),
+            enableRanking: false,
+            enableBulkEdit: false,
+            showRowActionsColumn: false,
+            columnCfgs: [{
+                xtype: 'templatecolumn',
+                tpl: '<tpl for="legend"><div class="tslegend" style="background-color:{color}">&nbsp;&nbsp;</div><div class="tslegendtext">&nbsp;&nbsp;{label}</div><span class="tslegendspacer">&nbsp;</span></tpl>',
+                width: 350
+            },{
+                text: 'Total Features',
+                dataIndex: 'totalCount',
+                flex: 1,
+                align: 'center'
+            },{
+                xtype: 'tasktodocolumn',
+                dataIndex: 'totalTaskToDo',
+                total: maxToDo,
+                text: "Total Task ToDo (wks)",
+                granularityDivider: 24*7,
+                flex: 2,
+                align: 'center'
+            },{
+                xtype: 'taskprogresscolumn',
+                dataIndex: 'totalTaskEstimate',
+                total: maxEstimate,
+                text: "Total Task Estimate (wks)",
+                granularityDivider: 24*7,
+                flex: 2,
+                align: 'center'
+            },{
+                xtype: 'taskprogresscolumn',
+                text: "Total Task Estimate %",
+                dataIndex: 'totalTaskEstimate',
+                flex: 2,
+                align: 'center'
+            },{
+                xtype: 'taskprogresscolumn',
+                dataIndex: 'totalTaskCount',
+                text: "Total # Tasks",
+                total: maxCount,
+                flex: 2,
+                align: 'center'
+            },{
+                xtype: 'taskprogresscolumn',
+                text: "Total # Tasks %",
+                dataIndex: 'totalTaskCount',
+                flex: 2,
+                align: 'center'
+
+            }],
+            width: '100%',
+            flex: 1,
+            showPagingToolbar: false
+        });
+    },
+    buildTreeGrid: function(records, maxToDo, maxEstimate, maxCount){
+        //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
+        this.logger.log('buildGrid', records);
+
+        var groupBy = this.getGroupByField();
+
+        this.logger.log('buildGrid records', records, groupBy);
+
+        if (groupBy){
+            //We need a tree grid
+        } else {
+            //A regular grid is fine.
+
+            this.getGridBox().add({
+                xtype: 'rallygrid',
+                context: this.getContext(),
+                modelNames: this.getExtendedModelName(),
+                //plugins: [
+                //    this.getFilterPlugin(),
+                //    this.getFieldPickerPlugin()
+                //],
+                store: Ext.create('Rally.data.custom.Store',{
+                    model: this.getExtendedModelName(),
+                    data: records
+                }),
+                enableRanking: false,
+                enableBulkEdit: false,
+                showRowActionsColumn: false,
+                columnCfgs: this.getColumnCfgs(maxToDo, maxEstimate, maxCount),
+                height: this.getHeight(),
+                width: '100%',
+                flex: 1
+            });
+        }
+
+
+    },
+    showErrorNotification: function(msg){
+        Rally.ui.notify.Notifier.showError({message: msg});
+    },
+    getGroupByField: function(){
+        return this.down('#cbGroupBy') && this.down('#cbGroupBy').getValue() || null;
+    },
+    getFeatureFilters: function(storyRecords){
+        var filters = [],
+            ids = [];
+        Ext.Array.each(storyRecords, function(s){
+            var id = s.get('Feature') && s.get('Feature').ObjectID;
+            if (id && !Ext.Array.contains(ids, id)){
+                ids.push(id);
+            }
+            if (ids.length > 25){
+                return false;
+            }
+        });
+        this.logger.log('getFeatureFilters.Feature ObjectIDs', ids);
+        if (ids.length > 0){
+            var filters = Ext.Array.map(ids, function(id){
+                return {
+                    property: 'ObjectID',
+                    value: id
+                };
+            });
+            return Rally.data.wsapi.Filter.or(filters);
+        }
+        return [];
+    },
+    getFeatureFetchList: function(){
+        var fetch =  ['ObjectID','FormattedID','Name'];
+        if (this.getGroupByField()){
+            fetch.push(this.getGroupByField());
+        }
+        return fetch;
+    },
+    getModelName: function(){
+        return this.getSetting('portfolioItemType');
+    },
+    fetchWsapiRecords: function(config){
+        var deferred = Ext.create('Deft.Deferred');
+        config.limit = 'Infinity';
+
+        Ext.create('Rally.data.wsapi.Store',config).load({
+            callback: function(records, operation, success){
+                this.logger.log('fetchFeatures.load',success, operation, records);
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                } else {
+                    var msg = Ext.String.format("Error fetching features: {0}", operation.error.errors.join(','));
+                    deferred.reject(msg);
+                }
+            },
+            scope: this
+        });
+        return deferred;
     },
     buildGrid: function(store){
 
@@ -715,14 +1370,50 @@ Ext.define("feature-status-by-task", {
         });
 
     },
+    getStoryFilters: function(){
+        var iterationCombo = this.down('rallyiterationcombobox'),
+            iterationFilter = iterationCombo && iterationCombo.getValue() && iterationCombo.getQueryFromSelected() || null,
+            milestoneFilter = null,
+            milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
+
+        this.logger.log('getStoryFilters',iterationCombo.getValue(), milestones);
+
+        if (milestones && milestones.length > 0){
+            milestoneFilter = Ext.Array.map(milestones, function(m){
+                return {
+                    property: "Milestones",
+                    value: m.get('_ref')
+                };
+            });
+            milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
+            this.logger.log('getStoryFilters milestoneFilter', milestoneFilter.toString());
+        }
+
+
+        if (iterationFilter && milestoneFilter){
+            return iterationFilter.and(milestoneFilter);
+        }
+        return iterationFilter || milestoneFilter || null;
+    },
+    getTaskOwners: function(){
+        var taskOwner = this.down('rallyusercombobox') && this.down('rallyusercombobox').getRecord();
+
+        this.logger.log('getTaskFilters', taskOwner);
+        if (taskOwner){
+            return [taskOwner.get('ObjectID')];
+        }
+        return null;
+    },
     fetchCalculatedData: function(store, node, featureRecords, success){
         this.logger.log('fetchCalculatedData', featureRecords);
+        var storyFilters = this.getStoryFilters(),
+            taskOwners = this.getTaskOwners();
         //task remaining (weeks)
         //task estimate weeks by state
         //% task estimate
         //# tasks
         //% # tasks
-        Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords).then({
+        Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords, storyFilters, taskOwners).then({
             success: this.updateSummary,
             failure: this.showError,
             scope: this
@@ -753,13 +1444,40 @@ Ext.define("feature-status-by-task", {
         this.logger.log('showError', msg);
         Rally.ui.notify.Notifier.showError({message: msg});
     },
-    getColumnCfgs: function(){
+    getColumnCfgs: function(maxToDo, maxEstimate, maxCount){
         return [{
             dataIndex: 'FormattedID'
-        },{
+        }, {
             dataIndex: 'Name',
             flex: 1
+        },{
+            xtype: 'tasktodocolumn',
+            dataIndex: '__taskToDo',
+            total: maxToDo,
+            text: "Task ToDo (wks)",
+            granularityDivider: 24*7
+        },{
+            xtype: 'taskprogresscolumn',
+            dataIndex: '__taskEstimate',
+            total: maxEstimate,
+            text: "Task Estimate (wks)",
+            granularityDivider: 24*7
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "% Task Estimate",
+            dataIndex: '__taskEstimate'
+        },{
+            xtype: 'taskprogresscolumn',
+            dataIndex: '__taskCount',
+            text: "# Tasks",
+            total: maxCount
+        },{
+            xtype: 'taskprogresscolumn',
+            text: "% #Tasks",
+            dataIndex: '__taskCount'
+
         }];
+
     },
     getCalculatedColumns: function(){
         var columns = [{
@@ -818,12 +1536,6 @@ Ext.define("feature-status-by-task", {
             stateId: this.getContext().getScopedStateId('ctd-columns-1')
         };
     },
-    getModelNames: function(){
-        return [this.getSetting('portfolioItemType')];
-    },
-    getFetchList: function(){
-        return ['ObjectID','FormattedID','UserStories'];
-    },
     getGridBox: function(){
         return this.down('#grid_box');
     },
@@ -879,6 +1591,46 @@ Ext.define("feature-status-by-task", {
     margin-top: 25px;
     margin-right: 5px;
     cursor: pointer;
+}
+
+.remaining-container {
+    border-radius: 3px;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background-color: #e6e6e6;
+    margin: 0 auto;
+}
+
+.tslegend {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    text-align: center;
+    color: white;
+    border-style: solid;
+    border-width: 1px;
+    display: inline-block;
+}
+
+.tslegendtext {
+    font-family: 'Lucida Grande', 'Lucida Sans Unicode', Verdana, Arial, Helvetica, sans-serif;
+    font-size: '14px'!important;
+    color: #274b6d;
+    display: inline
+}
+.tslegendspacer {
+    padding: 15px;
+    display: inline;
+}
+.tscenter {
+    width: 100%;
+    text-align: center;
+}
+
+.x-panel .x-grid-body .noborder
+{
+    border-width: 0px!important;
 }
     </style>
 

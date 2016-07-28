@@ -3,35 +3,129 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     MAX_CHUNK_SIZE: 25,
     TASK_STATES: ['Defined','In-Progress','Completed'],
 
-    load: function(records){
+    loadTasks: function(records){
         var deferred = Ext.create('Deft.Deferred');
 
-        var objectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        this.logger.log('CArABU.technicalservices.loadTasks.load objectIDs', featureObjectIDs);
+        this.fetchTaskChunks(featureObjectIDs).then({
+            success: function(taskRecords){
+                this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
+                var snapsByOid = this._getSnapsByOid(taskRecords, featureObjectIDs);
 
-        this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
-        var promises = [];
-        for (var i=0; i < objectIDs.length; i = i+this.MAX_CHUNK_SIZE){
-            var chunk = Ext.Array.slice(objectIDs, i, i + this.MAX_CHUNK_SIZE);
-            promises.push(this._fetchLBAPIChunk(chunk));
-        }
-
-        Deft.Promise.all(promises).then({
-            success: function(results){
-                this.logger.log('load Success', results);
-                var totals = this._calculateTaskRollups(_.flatten(results), records, objectIDs);
-
-                deferred.resolve(totals);
+                for (var i=0; i < records.length; i++){
+                    records[i].addTasks(snapsByOid[records[i].get('ObjectID') || [] ]);
+                }
+                deferred.resolve(records);
             },
             failure: function(msg){
-                this.logger.log('load Failure', msg);
+                this.logger.log('load.fetchTaskChunks FAILURE', msg);
+                deferred.reject(msg);
             },
             scope: this
         });
-
         return deferred;
-
     },
-    _calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
+
+    load: function(records, storyFilters, taskOwners){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        if (storyFilters){
+            this.fetchStories(featureObjectIDs, storyFilters).then({
+                success: function(storyIDs){
+                    this.logger.log('load Stories Success', storyIDs);
+                    this.fetchTaskChunks(storyIDs, taskOwners).then({
+                        success: function(taskRecords){
+                            this.logger.log('load.fetchStories.fetchTaskChunks SUCCESS', taskRecords);
+                            var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
+                            deferred.resolve(totals);
+                        },
+                        failure: function(msg){
+                            this.logger.log('load.fetchStories.fetchTaskChunks FAILURE', msg);
+                            deferred.reject(msg);
+                        },
+                        scope: this
+                    });
+                },
+                failure: function(msg){
+                    this.logger.log('load.fetchStories FAILURE', msg);
+                    deferred.reject(msg);
+                },
+                scope: this
+            });
+        } else {
+            this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
+            this.fetchTaskChunks(featureObjectIDs, taskOwners).then({
+                success: function(taskRecords){
+                    this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
+                    var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
+                    deferred.resolve(totals);
+                },
+                failure: function(msg){
+                    this.logger.log('load.fetchTaskChunks FAILURE', msg);
+                    deferred.reject(msg);
+                },
+                scope: this
+            });
+        }
+        return deferred;
+    },
+    fetchTaskChunks: function(ancestorObjectIDs, taskOwners){
+        var deferred = Ext.create('Deft.Deferred');
+        var promises = [];
+        for (var i=0; i < ancestorObjectIDs.length; i = i+this.MAX_CHUNK_SIZE){
+            var chunk = Ext.Array.slice(ancestorObjectIDs, i, i + this.MAX_CHUNK_SIZE);
+            promises.push(this._fetchLBAPIChunk(chunk, taskOwners));
+        }
+        Deft.Promise.all(promises).then({
+            success: function(results){
+                var records = _.flatten(results);
+                this.logger.log('fetchTaskChunks SUCCESS results', results,records);
+                deferred.resolve(records);
+            },
+            failure: function(msg){
+                this.logger.log('fetchTaskChunks FAILURE', ancestorObjectIDs, taskOwners, msg);
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+        return deferred;
+    },
+    fetchStories: function(featureObjectIDs, filters){
+        var deferred = Ext.create('Deft.Deferred');
+        //we are only interested in stories that have features
+        filters = filters.and({
+            property: 'Feature.ObjectID',
+            operator: '>',
+            value: 0
+        });
+
+        Ext.create('Rally.data.wsapi.Store',{
+            model: 'HierarchicalRequirement',
+            fetch: ['ObjectID','Feature'],
+            filters: filters,
+            limit: 'Infinity'
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    //we only want stories associated with the features that we passed in so we will filter those out.
+                    var storyIds = [];
+                    for (var i=0; i<records.length; i++){
+                        var featureID = records[i].get('Feature') && records[i].get('Feature').ObjectID;
+                        if (Ext.Array.contains(featureObjectIDs, featureID)){
+                            storyIds.push(records[i].get('ObjectID'));
+                        }
+                    }
+                    deferred.resolve(storyIds);
+                } else {
+                    deferred.reject("Error fetching stories: " + operation && operation.error && operation.error.errors.join(','));
+                }
+            }
+        });
+        return deferred;
+    },
+    calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
         this.logger.log('_calculateTaskRollups', taskRecords, featureRecords);
 
         var snapsByOid = this._getSnapsByOid(taskRecords, objectIDs),
@@ -138,37 +232,51 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
 
     },
     _getSnapsByOid: function(snapshots, featureObjectIDs){
-        var hash = {};
+
+         var hash = {};
         for (var i=0; i< snapshots.length; i++){
+
+            var snap = snapshots[i].getData();
             var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
                 objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
 
             if (!hash[objectID]){
                 hash[objectID] = [];
             }
-            hash[objectID].push(snapshots[i].getData());
+            hash[objectID].push(snap);
         }
         return hash;
     },
-    _fetchLBAPIChunk: function(objectIDs){
+    _fetchLBAPIChunk: function(objectIDs, taskOwners){
         var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_fetchLBAPIChunk', objectIDs, taskOwners);
+
+        var filters = [
+            {
+                property: '_ItemHierarchy',
+                operator: 'in',
+                value: objectIDs
+            },{
+                property: '_TypeHierarchy',
+                value: 'Task'
+            },{
+                property: '__At',
+                value: "current"
+            }
+
+        ];
+
+        if (taskOwners && taskOwners.length > 0){
+            filters.push({
+                property: 'Owner',
+                operator: 'in',
+                value: taskOwners
+            });
+        }
 
         Ext.create('Rally.data.lookback.SnapshotStore',{
             fetch: this._getLBAPIFetchList(),
-            filters: [
-                {
-                    property: '_ItemHierarchy',
-                    operator: 'in',
-                    value: objectIDs
-                },{
-                    property: '_TypeHierarchy',
-                    value: 'Task'
-                },{
-                    property: '__At',
-                    value: "current"
-                }
-
-            ],
+            filters: filters,
             hydrate: ['State'],
             sorters: [{
                 property: 'ObjectID',
@@ -179,12 +287,15 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         }).load({
             callback: function(records, operation, success){
                 if (success){
+                    this.logger.log('_fetchLBAPIChunk SUCCESS', records);
                     deferred.resolve(records);
                 } else {
                     var msg = "Failure loading snapshots for objectIDs: " + objectIDs.join(', ') + ":  " + operation.error.errors.join(',');
+                    this.logger.log('_fetchLBAPIChunk FAILURE', msg);
                     deferred.resolve(msg);
                 }
-            }
+            },
+            scope: this
         });
         return deferred;
     },
