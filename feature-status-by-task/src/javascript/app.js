@@ -5,7 +5,9 @@ Ext.define("feature-status-by-task", {
     defaults: { margin: 10 },
     items: [
         {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
-        {xtype:'container',itemId:'filter_box', layout: 'hbox'},
+        {xtype:'container',itemId:'filter_box_1', layout: 'hbox'},
+        {xtype:'container',itemId:'filter_box_2', layout: 'hbox'},
+        {xtype:'container',itemId:'filter_box_3', layout: 'hbox'},
         {xtype:'container',itemId:'summary_box', layout: 'hbox', padding: 25},
         {xtype:'container',itemId:'grid_box'}
     ],
@@ -21,38 +23,35 @@ Ext.define("feature-status-by-task", {
     },
     groupByFields: ['c_PMTMaster','c_PMTMasterName'],
     groupByModel: "PortfolioItem/Feature",
-                        
-    launch: function() {
-        this.addStoryFilters();
-        //this.buildStore();
-    },
-    //buildStore: function(){
-    //    this.getGridBox().removeAll();
-    //    var fetchList = this.getFeatureFetchList();
-    //    Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
-    //        models: this.getModelName(),
-    //        enableHierarchy: false,
-    //        fetch: fetchList
-    //    }).then({
-    //        success: this.buildGrid,
-    //        scope: this
-    //    });
-    //
-    //},
-    addStoryFilters: function(){
-        this.logger.log('addStoryFilters');
 
-        var ct = this.down('#filter_box');
+
+    labelWidth: [150,150,150],
+    controlWidth: [350,350,350],
+    margin: '0 5 0 5',
+
+    launch: function() {
+        this.addFeatureFilters();
+        this.addStoryFilters();
+        this.addTaskFilters();
+
+    },
+    addFeatureFilters: function(){
+        var ct = this.down('#filter_box_1');
         ct.removeAll();
 
+        var idx = 0;
         var groupByFields = this.groupByFields;
         ct.add({
             xtype: 'rallyfieldcombobox',
             fieldLabel: 'Group by',
             labelAlign: 'right',
             itemId: 'cbGroupBy',
-            margin: 5,
+            margin: this.margin,
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++],
             allowNoEntry: true,
+            noEntryText: "Feature",
+            disabled: true,
             model: this.getModelName(),
             _isNotHidden: function(field){
                 if (Ext.Array.contains(groupByFields, field.name)){
@@ -61,38 +60,74 @@ Ext.define("feature-status-by-task", {
                 return false;
             }
         });
-
-
         ct.add({
-            xtype: 'rallyreleasecombobox',
-            margin: 5,
-            fieldLabel: 'Release',
+            xtype: 'rallymilestonepicker',
+            itemId: 'featureMilestones',
+            fieldLabel: 'Feature Milestones',
+            margin: this.margin,
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++],
             labelAlign: 'right'
         });
 
+    },
+    addStoryFilters: function(){
+        this.logger.log('addStoryFilters');
+
+        var ct = this.down('#filter_box_2');
+        ct.removeAll();
+
+        var idx = 0;
+
         ct.add({
             xtype: 'rallymilestonepicker',
-            margin: 5,
+            itemId: 'storyMilestones',
+            margin: this.margin,
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++],
             fieldLabel: 'Story Milestones',
             labelAlign: 'right'
         });
 
         ct.add({
-            xtype: 'rallyusercombobox',
-            margin: 5,
-            fieldLabel: 'Task Owner',
+            xtype: 'rallyreleasecombobox',
+            margin: this.margin,
+            fieldLabel: 'Story Release',
+            labelWidth: this.labelWidth[idx] - 23,
+            width: this.controlWidth[idx++] + 23,
             labelAlign: 'right'
         });
 
         ct.add({
+            xtype: 'rallyusercombobox',
+            margin: this.margin,
+            fieldLabel: 'Task Owner',
+            labelAlign: 'right',
+            disabled: true,
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++],
+        });
+
+
+        ct.add({
             xtype: 'rallybutton',
-            margin: 5,
+            margin: '0 5 0 25',
             text: 'Go',
+            width: 100,
+
             listeners: {
                 click: this.updateView,
                 scope: this
             }
         });
+    },
+    addTaskFilters: function(){
+
+        var ct = this.down('#filter_box_3');
+        ct.removeAll();
+
+        var idx = 0;
+
 
     },
     getExtendedModelName: function(){
@@ -130,7 +165,8 @@ Ext.define("feature-status-by-task", {
 
                 CArABU.technicalservices.Utility.fetchChunkedWsapiRecords({
                     model: model,
-                    fetch: this.getFeatureFetchList()
+                    fetch: this.getFeatureFetchList(),
+                    filters: this.getFeatureFilters()
                 }, featureIDs).then({
                     success: this.fetchTasks,
                     failure: this.showErrorNotification,
@@ -325,6 +361,21 @@ Ext.define("feature-status-by-task", {
         this.logger.log('getFeatureIDs.Feature ObjectIDs', ids);
         return ids;
     },
+    getFeatureFilters: function(){
+        var milestoneFilter = null;
+        var milestones = this.down('#featureMilestones') && this.down('#featureMilestones').getValue();
+            if (milestones && milestones.length > 0){
+            milestoneFilter = Ext.Array.map(milestones, function(m){
+                return {
+                    property: "Milestones",
+                    value: m.get('_ref')
+                };
+            });
+            milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
+            this.logger.log('getFeatureFilters milestoneFilter', milestoneFilter.toString());
+        }
+        return milestoneFilter;
+    },
     getFeatureFetchList: function(){
         var fetch =  ['ObjectID','FormattedID','Name'];
         if (this.getGroupByField()){
@@ -389,7 +440,7 @@ Ext.define("feature-status-by-task", {
         var timeboxCombo = this.down('rallyreleasecombobox'),
             timeboxFilter = timeboxCombo && timeboxCombo.getValue() && timeboxCombo.getQueryFromSelected() || null,
             milestoneFilter = null,
-            milestones = this.down('rallymilestonepicker') && this.down('rallymilestonepicker').getValue();
+            milestones = this.down('#storyMilestones') && this.down('#storyMilestones').getValue();
 
         this.logger.log('getStoryFilters',timeboxCombo.getValue(), milestones);
 
@@ -491,7 +542,7 @@ Ext.define("feature-status-by-task", {
             xtype: 'taskprogresscolumn',
             text: "% #Tasks",
             dataIndex: '__taskCount',
-            sortable: false 
+            sortable: false
 
         }];
 
