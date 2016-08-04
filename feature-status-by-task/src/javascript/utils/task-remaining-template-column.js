@@ -28,6 +28,7 @@ Ext.define('CArABU.technicalservices.TaskToDoTemplate',{
             return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
         },
         calculateWidth: function (values) {
+            console.log('calculateWidth',values);
             var total =  this.total,
                 numerator = values[this.field][0] + values[this.field][1];
             if (total > 0 && numerator){

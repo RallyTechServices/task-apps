@@ -38,10 +38,17 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         this.logger.log('addTasks', snaps);
                         this.tasks = snaps || [];
                     },
-                    calculateRollups: function(taskOwners) {
+                    hasTasks: function(){
+                        var taskCount = this.get('__taskCount') || [0];
+                        return Ext.Array.sum(taskCount) > 0;
+                    },
+                    calculateRollups: function(taskOwners, storyOids) {
                         var TASK_STATES = ['Defined','In-Progress','Completed'];
                         var snaps = this.tasks || [];
-                        this.logger.log('calculateRollups', snaps, taskOwners);
+                        this.logger.log('calculateRollups', snaps, taskOwners, storyOids);
+
+
+                        storyOids = storyOids || [];
 
                         var taskCount = [0, 0, 0],
                             taskEstimate = [0, 0, 0],
@@ -57,6 +64,10 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                                 if (taskOwners && taskOwners.length > 0){
                                     includeTask = Ext.Array.contains(taskOwners, snap.Owner);
+                                }
+
+                                if (includeTask && storyOids && storyOids.length > 0){
+                                    includeTask = Ext.Array.contains(storyOids, snap.WorkProduct);
                                 }
 
                                 if (includeTask){

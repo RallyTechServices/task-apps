@@ -3,7 +3,7 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     MAX_CHUNK_SIZE: 25,
     TASK_STATES: ['Defined','In-Progress','Completed'],
 
-    loadTasks: function(records){
+    loadTasks: function(records, taskOwners, storyOids){
         var deferred = Ext.create('Deft.Deferred');
 
         var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
@@ -71,12 +71,12 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         }
         return deferred;
     },
-    fetchTaskChunks: function(ancestorObjectIDs, taskOwners){
+    fetchTaskChunks: function(ancestorObjectIDs, taskOwners, storyOids){
         var deferred = Ext.create('Deft.Deferred');
         var promises = [];
         for (var i=0; i < ancestorObjectIDs.length; i = i+this.MAX_CHUNK_SIZE){
             var chunk = Ext.Array.slice(ancestorObjectIDs, i, i + this.MAX_CHUNK_SIZE);
-            promises.push(this._fetchLBAPIChunk(chunk, taskOwners));
+            promises.push(this._fetchLBAPIChunk(chunk, taskOwners, storyOids));
         }
         Deft.Promise.all(promises).then({
             success: function(results){
@@ -247,9 +247,9 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         }
         return hash;
     },
-    _fetchLBAPIChunk: function(objectIDs, taskOwners){
+    _fetchLBAPIChunk: function(objectIDs, taskOwners, storyOids){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_fetchLBAPIChunk', objectIDs, taskOwners);
+        this.logger.log('_fetchLBAPIChunk', objectIDs, taskOwners, storyOids);
 
         var filters = [
             {
@@ -266,13 +266,21 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
 
         ];
 
-        if (taskOwners && taskOwners.length > 0){
-            filters.push({
-                property: 'Owner',
-                operator: 'in',
-                value: taskOwners
-            });
-        }
+        //if (taskOwners && taskOwners.length > 0){
+        //    filters.push({
+        //        property: 'Owner',
+        //        operator: 'in',
+        //        value: taskOwners
+        //    });
+        //}
+        //
+        //if (storyOids && storyOids.length > 0){
+        //    filters.push({
+        //        property: 'WorkProduct',
+        //        operator: 'in',
+        //        value: storyOids
+        //    });
+        //}
 
         Ext.create('Rally.data.lookback.SnapshotStore',{
             fetch: this._getLBAPIFetchList(),
@@ -335,7 +343,7 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         return ['ObjectID','Feature','Tasks','State','Estimate','ToDo'];
     },
     _getLBAPIFetchList: function(){
-        return ['ObjectID','State','Estimate','ToDo','_ItemHierarchy'];
+        return ['ObjectID','State','Estimate','ToDo','_ItemHierarchy','WorkProduct','Owner'];
     }
 
 });

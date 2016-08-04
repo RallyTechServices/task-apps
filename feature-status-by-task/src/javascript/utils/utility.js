@@ -1,6 +1,67 @@
 Ext.define('CArABU.technicalservices.Utility',{
     singleton: true,
     MAX_CHUNK_SIZE: 25,
+
+    managerObjectIDReportsHash: {},
+
+    fetchManagerTree: function(managerIDField, employeeIDField){
+        var deferred = Ext.create('Deft.Deferred');
+        this.fetchWsapiRecords({
+            model: 'User',
+            fetch: ['ObjectID',managerIDField, employeeIDField],
+            filters: [{
+                property: employeeIDField,
+                operator: '!=',
+                value: ""
+            }]
+        }).then({
+            success: function(records){
+                CArABU.technicalservices.Utility.managerObjectIDReportsHash = CArABU.technicalservices.Utility.buildManagerTree(records, managerIDField, employeeIDField);
+                deferred.resolve();
+            },
+            failure: function(msg){
+                deferred.reject(msg);
+            }
+        });
+        return deferred;
+    },
+    getReports: function(userRecord){
+        var objectID = userRecord.get('ObjectID'),
+            hash = CArABU.technicalservices.Utility.managerObjectIDReportsHash;
+
+        var getSubReports = function(id){
+            var subReports = hash[id] || [];
+            Ext.Array.each(subReports, function(id){
+                subReports = subReports.concat(getSubReports(id));
+            });
+            return subReports;
+        };
+
+        var reports = getSubReports(objectID);
+        return reports;
+    },
+    buildManagerTree: function(userRecords, managerIDField, employeeIDField){
+        var managerIDReportObjectIDMap = {},
+            employeeIDObjectIDMap = {};
+
+        Ext.Array.each(userRecords, function(u){
+            var manager= u.get(managerIDField),
+                employeeID = u.get(employeeIDField);
+            employeeIDObjectIDMap[employeeID] = u.get('ObjectID');
+            if (!managerIDReportObjectIDMap[manager]){
+                managerIDReportObjectIDMap[manager] = [];
+            }
+            managerIDReportObjectIDMap[manager].push(u.get('ObjectID'));
+        });
+
+        var reportsHash = {};
+        Ext.Object.each(managerIDReportObjectIDMap, function(managerID, reports){
+            var objId = employeeIDObjectIDMap[managerID];
+            reportsHash[objId] = reports;
+        });
+
+        return reportsHash;
+    },
     fetchWsapiRecords: function(config){
         var deferred = Ext.create('Deft.Deferred');
         config.limit = 'Infinity';
@@ -22,7 +83,6 @@ Ext.define('CArABU.technicalservices.Utility',{
         var promises = [],
             filterOids = false ;
 
-        console.log('fetchChunkedWsapiRecords', config.filters);
         if (config.filters){
 
             promises.push(CArABU.technicalservices.Utility.fetchWsapiRecords(config));

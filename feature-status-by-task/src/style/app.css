@@ -55,3 +55,10 @@
 {
     border-width: 0px!important;
 }
+
+.absolute-cell-inner > .x-grid-cell-inner-treecolumn {
+    position: absolute !important;
+}
+.x-grid-row {
+    position: relative !important;
+}
