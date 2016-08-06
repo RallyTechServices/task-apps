@@ -3,10 +3,10 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 28 2016 11:19:52 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Aug 04 2016 13:05:27 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 28 2016 11:19:52 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Aug 04 2016 13:05:27 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -80,6 +80,13 @@
 .x-panel .x-grid-body .noborder
 {
     border-width: 0px!important;
+}
+
+.absolute-cell-inner > .x-grid-cell-inner-treecolumn {
+    position: absolute !important;
+}
+.x-grid-row {
+    position: relative !important;
 }
     </style>
 

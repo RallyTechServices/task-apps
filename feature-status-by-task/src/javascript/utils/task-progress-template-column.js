@@ -50,11 +50,9 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
                 numerator = values[this.field][stateIdx];
 
             if (total > 0 && numerator){
-                console.log('calculateWidth', values.FormattedID, stateIdx, Math.floor(numerator/total * 100));
                 return (numerator/total * 100) + '%';
             }
             return 0
-
         },
         getText: function(values, stateIdx){
 
@@ -78,7 +76,6 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
                 return Math.round(val) || "";
             }
             return "";
-
         }
     },
 
