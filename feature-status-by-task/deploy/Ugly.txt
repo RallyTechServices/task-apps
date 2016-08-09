@@ -3,10 +3,10 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 08 2016 20:33:51 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Aug 09 2016 14:30:26 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 08 2016 20:33:51 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Aug 09 2016 14:30:26 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     

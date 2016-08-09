@@ -111,6 +111,13 @@ Ext.define("feature-status-by-task", {
             listeners: {
                 select: function(pk){
                     pk.syncSelectionText();
+                },
+                deselect: function(pk,value,values){
+                    pk.syncSelectionText();
+                    if (!values || values.length === 0){
+                        pk.setValueText("");
+                    }
+
                 }
             }
         });
@@ -127,6 +134,13 @@ Ext.define("feature-status-by-task", {
             listeners: {
                 select: function(pk){
                     pk.syncSelectionText();
+                },
+                deselect: function(pk,value,values){
+                    pk.syncSelectionText();
+                    console.log('deselect',values);
+                    if (!values || values.length === 0){
+                        pk.setValueText("");
+                    }
                 }
             }
         });
