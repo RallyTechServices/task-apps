@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 08 2016 20:18:05 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Aug 08 2016 20:33:51 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 08 2016 20:18:05 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Aug 08 2016 20:33:51 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 113868602382;
+        var CHECKSUM = 114543226242;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -861,7 +861,7 @@ Ext.define('CArABU.technicalservices.TaskProgressTemplateColumn', {
         me.callParent(arguments);
     },
     defaultRenderer: function(value, meta, record) {
-
+        meta.style = 'cursor: pointer;';
         var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }
@@ -972,6 +972,7 @@ Ext.define('CArABU.technicalservices.TaskToDoTemplateColumn', {
         me.callParent(arguments);
     },
     defaultRenderer: function(value, meta, record) {
+        meta.style = 'cursor: pointer;';
         var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }
@@ -2017,7 +2018,11 @@ Ext.define("feature-status-by-task", {
             dataIndex: 'Name',
             menuDisabled: true,
             width: totalWidth - 100,
-            sortable: idAndNameSortable
+            sortable: idAndNameSortable,
+            renderer: function (val, metadata, record) {
+                metadata.style = 'cursor: pointer;';
+                return val;
+            }
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,

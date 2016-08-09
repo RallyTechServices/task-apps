@@ -103,6 +103,7 @@ Ext.define('CArABU.technicalservices.TaskToDoTemplateColumn', {
         me.callParent(arguments);
     },
     defaultRenderer: function(value, meta, record) {
+        meta.style = 'cursor: pointer;';
         var data = Ext.apply({}, record.getData()); //record.get('rollup')); //, record.getAssociatedData());
         return this.tpl.apply(data);
     }

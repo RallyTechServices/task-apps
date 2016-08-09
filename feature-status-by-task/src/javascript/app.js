@@ -916,7 +916,11 @@ Ext.define("feature-status-by-task", {
             dataIndex: 'Name',
             menuDisabled: true,
             width: totalWidth - 100,
-            sortable: idAndNameSortable
+            sortable: idAndNameSortable,
+            renderer: function (val, metadata, record) {
+                metadata.style = 'cursor: pointer;';
+                return val;
+            }
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,
