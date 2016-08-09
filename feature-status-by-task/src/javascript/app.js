@@ -36,9 +36,9 @@ Ext.define("feature-status-by-task", {
         this.setLoading('Initializing Users...');
         CArABU.technicalservices.Utility.fetchManagerTree(this.getManagerIDField(), this.getEmployeeIDField()).then({
             success: function(){
-                this.addFeatureFilters();
-                this.addStoryFilters();
-                this.addTaskFilters();
+                this.addMilestonesBox();
+                this.addUserBox();
+                this.addGroupByBox();
             },
             failure: this.showErrorNotification,
             scope: this
@@ -50,8 +50,8 @@ Ext.define("feature-status-by-task", {
     getEmployeeIDField: function(){
         return this.getSetting('employeeIDField');
     },
-    addFeatureFilters: function(){
-        var ct = this.down('#filter_box_1');
+    addGroupByBox: function(){
+        var ct = this.down('#filter_box_3');
         ct.removeAll();
 
         var idx = 0;
@@ -77,6 +77,27 @@ Ext.define("feature-status-by-task", {
                 return false;
             }
         });
+
+        ct.add({
+            xtype: 'rallybutton',
+            margin: '0 5 0 25',
+            text: 'Update',
+            width: 100,
+
+            listeners: {
+                click: this.updateView,
+                scope: this
+            }
+        });
+
+    },
+    addMilestonesBox: function(){
+        this.logger.log('addStoryFilters');
+
+        var ct = this.down('#filter_box_1');
+        ct.removeAll();
+
+        var idx = 0;
         ct.add({
             xtype: 'rallymilestonepicker',
             itemId: 'featureMilestones',
@@ -86,18 +107,13 @@ Ext.define("feature-status-by-task", {
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
-            labelAlign: 'right'
+            labelAlign: 'right',
+            listeners: {
+                select: function(pk){
+                    pk.syncSelectionText();
+                }
+            }
         });
-
-    },
-    addStoryFilters: function(){
-        this.logger.log('addStoryFilters');
-
-        var ct = this.down('#filter_box_2');
-        ct.removeAll();
-
-        var idx = 0;
-
         ct.add({
             xtype: 'rallymilestonepicker',
             itemId: 'storyMilestones',
@@ -107,7 +123,12 @@ Ext.define("feature-status-by-task", {
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
             fieldLabel: 'Story Milestones',
-            labelAlign: 'right'
+            labelAlign: 'right',
+            listeners: {
+                select: function(pk){
+                    pk.syncSelectionText();
+                }
+            }
         });
 
         ct.add({
@@ -121,51 +142,58 @@ Ext.define("feature-status-by-task", {
             labelAlign: 'right'
         });
 
-        var labelWidth = this.labelWidth[idx];
-        ct.add({
-            xtype: 'container',
-            layout: 'vbox',
-            padding: 0,
-            items:[{
-                xtype: 'rallyusercombobox',
-                margin: this.margin,
-                fieldLabel: 'Task Owner',
-                labelAlign: 'right',
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('fts-user'),
-              //  disabled: true,
-                displayField: "DisplayName",
-                labelWidth: labelWidth,
-                width: this.controlWidth[idx++],
-            },{
-                xtype: 'checkboxfield',
-                margin: '0 5 0 ' + (labelWidth + 10),
-                boxLabelAlign: 'after',
-                boxLabel:'Include reports',
-                value: true,
-                itemId: 'ckIncludeReports'
-            }]
-        });
 
 
-        ct.add({
-            xtype: 'rallybutton',
-            margin: '0 5 0 25',
-            text: 'Go',
-            width: 50,
 
-            listeners: {
-                click: this.updateView,
-                scope: this
-            }
-        });
+
     },
-    addTaskFilters: function(){
+    addUserBox: function(){
 
-        var ct = this.down('#filter_box_3');
+        this.logger.log('addUserBox');
+
+        var ct = this.down('#filter_box_2');
         ct.removeAll();
 
         var idx = 0;
+        ct.add({
+            xtype: 'rallyusercombobox',
+            margin: this.margin,
+            itemId: 'usrTaskOwner',
+            fieldLabel: 'Task Owner',
+            labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-task-owner'),
+            displayField: "DisplayName",
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++]
+        });
+
+        ct.add({
+            xtype: 'rallyusercombobox',
+            margin: this.margin,
+            fieldLabel: 'Manager',
+            itemId: 'usrManager',
+            labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-manager'),
+            displayField: "DisplayName",
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++]
+        });
+
+        ct.add({
+            xtype: 'rallyusercombobox',
+            margin: this.margin,
+            fieldLabel: 'Feature Owner',
+            itemId: 'usrFeatureOwner',
+            labelAlign: 'right',
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-feature-owner'),
+            displayField: "DisplayName",
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++]
+        });
+
 
 
     },
@@ -255,7 +283,7 @@ Ext.define("feature-status-by-task", {
             totalEstimate = [0,0,0],
             taskOwners = this.getTaskOwners(),
             refinedRecords = [];
-
+        this.logger.log('refineRecords taskOwners', taskOwners);
         Ext.Array.each(records, function(r){
             var resultsHash = r.calculateRollups(taskOwners, this.filterStoryObjectIDs);
             maxToDo = Math.max(maxToDo, Ext.Array.sum(resultsHash.todo));
@@ -323,7 +351,7 @@ Ext.define("feature-status-by-task", {
                 dataIndex: 'totalTaskToDo',
                 total: maxToDo,
                 text: "Total Task ToDo (wks)",
-                granularityDivider: 24*7,
+                granularityDivider: 40,
                 flex: 2,
                 align: 'center'
             },{
@@ -331,7 +359,7 @@ Ext.define("feature-status-by-task", {
                 dataIndex: 'totalTaskEstimate',
                 total: maxEstimate,
                 text: "Total Task Estimate (wks)",
-                granularityDivider: 24*7,
+                granularityDivider: 40,
                 flex: 2,
                 align: 'center'
             },{
@@ -523,22 +551,26 @@ Ext.define("feature-status-by-task", {
     },
     getAdditionalStoryColumnCfgs: function(){
         return [{
-            dataIndex: "Feature",
+            xtype: 'templatecolumn',
+            tpl: '<tpl>{name}</tpl>',
             text: "Feature Owner",
-            renderer: function(v,m,r){
-                if (v){
-                    return v.Owner.DisplayName;
-                }
-                return '';
+            defaultRenderer: function(value, meta, record) {
+                var feature = record.get('Feature')
+                return this.tpl.apply({name: feature && feature.Owner && feature.Owner.DisplayName || "" });
             }
+            //renderer: function(v,m,r){
+            //    if (v){
+            //        return v.Owner.DisplayName;
+            //    }
+            //    return '';
+            //}
         },{
-            dataIndex: "Feature",
+            xtype: 'templatecolumn',
             text: "Feature QE Owner",
-            renderer: function(v,m,r){
-                if (v){
-                    return v.c_QEOwner;
-                }
-                return '';
+            tpl: '<tpl>{c_QEOwner}</tpl>',
+            defaultRenderer: function(value, meta, record) {
+                var feature = record.get('Feature')
+                return this.tpl.apply(feature);
             }
         }];
     },
@@ -556,7 +588,7 @@ Ext.define("feature-status-by-task", {
                 property: "Feature." + featureFilterField,
                 value: record.get(featureFilterField)
             });
-        filters = filters.and(this.getStoryFilters());
+        filters = filters.and(this.getStoryDetailFilters());
 
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: modelNames,
@@ -573,7 +605,7 @@ Ext.define("feature-status-by-task", {
                     context: this.getContext(),
                     modelNames: modelNames,
                     stateful: false,
-                    stateId: "grid-100",
+                    stateId: "grid-detail",
                     itemId: 'detail-grid',
                     toggleState: 'grid',
                     plugins: [{
@@ -581,7 +613,7 @@ Ext.define("feature-status-by-task", {
                         headerPosition: 'left',
                         modelNames: modelNames,
                         stateful: true,
-                        stateId: this.getContext().getScopedStateId('detail-columns-0716')
+                        stateId: this.getContext().getScopedStateId('detail-columns')
                     },{
                         ptype: 'rallygridboardinlinefiltercontrol',
                         inlineFilterButtonConfig: {
@@ -657,7 +689,7 @@ Ext.define("feature-status-by-task", {
     getFeatureFilters: function(){
         var milestoneFilter = null;
         var milestones = this.down('#featureMilestones') && this.down('#featureMilestones').getValue();
-            if (milestones && milestones.length > 0){
+        if (milestones && milestones.length > 0){
             milestoneFilter = Ext.Array.map(milestones, function(m){
                 return {
                     property: "Milestones",
@@ -666,6 +698,22 @@ Ext.define("feature-status-by-task", {
             });
             milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
             this.logger.log('getFeatureFilters milestoneFilter', milestoneFilter.toString());
+        }
+
+        var featureOwner = this.down('#usrFeatureOwner') && this.down('#usrFeatureOwner').getValue(),
+            featureOwnerFilter = null;
+        this.logger.log('getFeatureFilters',featureOwner);
+        if (featureOwner){
+            featureOwnerFilter = Ext.create('Rally.data.wsapi.Filter',{
+                property: 'Owner',
+                value: featureOwner
+            });
+            this.logger.log('getFeatureFilters featureOwnerFilter', featureOwnerFilter.toString());
+
+            if (milestoneFilter){
+                return featureOwnerFilter.and(milestoneFilter);
+            }
+            return featureOwnerFilter;
         }
         return milestoneFilter;
     },
@@ -718,6 +766,7 @@ Ext.define("feature-status-by-task", {
                 stateful: true,
                 enableRanking: false,
                 enableBulkEdit: false,
+                enableEditing: false,
                 folderSort: false,
                 shouldShowRowActionsColumn: false,
                 columnCfgs: this.getColumnCfgs(),
@@ -728,6 +777,31 @@ Ext.define("feature-status-by-task", {
             flex: 1
         });
 
+    },
+    getStoryDetailFilters: function(){
+        var filters = this.getStoryFilters();
+
+        var taskOwners = this.getTaskOwners();
+        if (taskOwners){
+
+            var taskOwnerFilters = _.map(taskOwners, function(t){
+                return {
+                    property: 'Tasks.Owner.ObjectID',
+                    value: t
+                };
+            });
+            taskOwnerFilters = Rally.data.wsapi.Filter.or(taskOwnerFilters);
+            if (filters){
+                filters = taskOwnerFilters.and(filters);
+            } else {
+                filters = taskOwnerFilters;
+            }
+
+        }
+        this.logger.log('getStoryDetailFilters', filters.toString());
+        return filters;
+
+        //Now we need to filter on task owner and manager owner
     },
     getStoryFilters: function(){
         var timeboxCombo = this.down('rallyreleasecombobox'),
@@ -755,18 +829,20 @@ Ext.define("feature-status-by-task", {
         return timeboxFilter || milestoneFilter || null;
     },
     getTaskOwners: function(){
-        var taskOwner = this.down('rallyusercombobox') && this.down('rallyusercombobox').getRecord();
-        var includeReports = this.down('#ckIncludeReports').getValue();
+        var taskOwner = this.down('#usrTaskOwner') && this.down('#usrTaskOwner').getRecord();
+        var manager = this.down('#usrManager') && this.down('#usrManager').getRecord();
 
-        this.logger.log('getTaskFilters', taskOwner,includeReports);
-        if (taskOwner){
-            var users = [];
+        this.logger.log('getTaskFilters', taskOwner,manager);
+        var users = [];
+        if (taskOwner && taskOwner.get('ObjectID')){
             users.push(taskOwner.get('ObjectID'));
-            if (includeReports){
-                this.logger.log('getTaskFilters including reports', taskOwner.get('ObjectID'));
-                var reports = CArABU.technicalservices.Utility.getReports(taskOwner);
-                users = users.concat(reports);
-            }
+        }
+        if (manager){
+            this.logger.log('getTaskFilters including manager reports', manager);
+            var reports = CArABU.technicalservices.Utility.getReports(manager);
+            users = users.concat(reports);
+        }
+        if (users.length > 0){
             return users;
         }
         return null;
@@ -796,15 +872,18 @@ Ext.define("feature-status-by-task", {
 
         var groupBy = this.getGroupByField();
         var totalWidth = 450,
-            treeColumnWidth = 0;
+            treeColumnWidth = 0,
+            idAndNameSortable = true ;
 
         if (groupBy){
-            treeColumnWidth = 25;
+            treeColumnWidth = 75;
+            idAndNameSortable = false;
             columns.push({
                 xtype: 'treecolumn',
-               // text: this.getGroupByDisplayName(),
+                text: this.getGroupByDisplayName(),
                 dataIndex: groupBy,
                 tdCls: 'absolute-cell-inner',
+                menuDisabled: true,
                 width: treeColumnWidth,
                 renderer: function(v,m,r){
                     //We don't want to show this field if this is a leaf node.
@@ -817,10 +896,16 @@ Ext.define("feature-status-by-task", {
 
         }
         totalWidth = totalWidth-treeColumnWidth;
+        var formattedIDColText = "ID";
+        if (groupBy){
+            formattedIDColText = '';
+        }
         return columns.concat([{
             dataIndex: 'FormattedID',
-            text: 'ID',
+            text: formattedIDColText,
+            menuDisabled: true,
             width: 100,
+            sortable: idAndNameSortable,
             renderer: function(v,m,r){
                 var tpl = Ext.create('Rally.ui.renderer.template.FormattedIDTemplate');
 
@@ -829,13 +914,16 @@ Ext.define("feature-status-by-task", {
         }, {
             text: 'Name',
             dataIndex: 'Name',
-            width: totalWidth - 100
+            menuDisabled: true,
+            width: totalWidth - 100,
+            sortable: idAndNameSortable
         },{
             xtype: 'tasktodocolumn',
+            menuDisabled: true,
             dataIndex: '__taskToDo',
             total: maxToDo,
             text: "Task ToDo (wks)",
-            granularityDivider: 24*7,
+            granularityDivider: 40,
             flex: 2,
             listeners: {
                 columnresize: this.saveColumnWidths,
@@ -846,8 +934,9 @@ Ext.define("feature-status-by-task", {
             xtype: 'taskprogresscolumn',
             dataIndex: '__taskEstimate',
             total: maxEstimate,
+            menuDisabled: true,
             text: "Task Estimate (wks)",
-            granularityDivider: 24*7,
+            granularityDivider: 40,
             flex: 2,
             listeners: {
                 columnresize: this.saveColumnWidths,
@@ -857,6 +946,7 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'taskprogresscolumn',
             text: "% Task Estimate",
+            menuDisabled: true,
             dataIndex: '__taskEstimate',
             flex: 2,
             sortable: false,
@@ -869,6 +959,7 @@ Ext.define("feature-status-by-task", {
             xtype: 'taskprogresscolumn',
             dataIndex: '__taskCount',
             text: "# Tasks",
+            menuDisabled: true,
             total: maxCount,
             flex: 2,
             listeners: {
@@ -881,6 +972,7 @@ Ext.define("feature-status-by-task", {
             text: "% #Tasks",
             dataIndex: '__taskCount',
             sortable: false,
+            menuDisabled: true,
             flex: 2,
             listeners: {
                 columnresize: this.saveColumnWidths,
