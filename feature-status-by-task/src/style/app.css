@@ -62,3 +62,7 @@
 .x-grid-row {
     position: relative !important;
 }
+
+.x-column-header-text {
+    font-size: 12px!important;
+}
