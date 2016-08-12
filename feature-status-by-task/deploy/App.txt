@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Aug 12 2016 15:12:45 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Aug 12 2016 15:21:30 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Aug 12 2016 15:12:45 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Aug 12 2016 15:21:30 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 146641520050;
+        var CHECKSUM = 146842807439;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1562,7 +1562,7 @@ Ext.define("feature-status-by-task", {
     },
     fetchFeatures: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-
+        this.logger.log('fetchFeatures', records);
         this.filterStoryObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
         var featureIDs = this.getFeatureIDs(records);
 
@@ -2254,7 +2254,7 @@ Ext.define("feature-status-by-task", {
             return timeboxFilter;
         }
 
-       return milestoneFilter || null;
+       return milestoneFilter || [];
     },
     getTaskOwners: function(){
         var taskOwner = this.down('#usrTaskOwner') && this.down('#usrTaskOwner').getRecord();
