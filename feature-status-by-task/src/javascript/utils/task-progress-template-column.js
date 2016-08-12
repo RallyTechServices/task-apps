@@ -32,6 +32,10 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             return 'width: ' + this.width + '; height: ' + this.height + '; line-height: ' + this.height + ';display: inline-block';
         },
         getPercent: function(values, stateIdx){
+
+            if (!this.calcPercent){
+                return values && values[this.field] && values[this.field][stateIdx] || 0;
+            }
             var val = 0;
             var total =  Ext.Array.sum(values[this.field]),
                 numerator = values[this.field][stateIdx];
@@ -111,7 +115,8 @@ Ext.define('CArABU.technicalservices.TaskProgressTemplateColumn', {
         me.tpl = Ext.create('CArABU.technicalservices.PctCompleteTemplate',{
             field: me.dataIndex,
             total: me.total,
-            granularityDivider: me.granularityDivider
+            granularityDivider: me.granularityDivider,
+            calcPercent: me.calcPercent || false
         });
         me.callParent(arguments);
     },

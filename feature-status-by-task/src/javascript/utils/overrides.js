@@ -72,3 +72,29 @@ Ext.override(Rally.ui.grid.TreeGrid, {
     }
 });
 
+Ext.override(Rally.ui.combobox.TimeboxComboBox, {
+    initComponent: function() {
+
+        this.displayTpl = Ext.create('Ext.XTemplate',
+            '<tpl for=".">{[this.getName(values)]}<tpl if="xindex<xcount">, </tpl></tpl>',
+            {
+                getName: function(values){
+                    return values.formattedName || "Unscheduled";
+                }
+            }
+        );
+
+        if (this.showArrows) {
+            this.pickerOffset = [21, 0];
+
+            this.displayTpl = Ext.create('Ext.XTemplate',
+                '<tpl for=".">{formattedName}<tpl if="formattedStartDate"> ({formattedStartDate} - {formattedEndDate})</tpl></tpl>'
+            );
+        }
+
+        this.callParent(arguments);
+        this.store.on('add', this._onStoreAdd, this);
+        this.on('change', this._onChange, this);
+        this.on('expand', this._onExpand, this);
+    },
+});

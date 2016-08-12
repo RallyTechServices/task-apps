@@ -26,7 +26,19 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     sortType: function(value) {
                         return Ext.Array.sum(value);
                     }
-               }];
+                },{
+                    name: '__taskEstimatePct',
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return  value && value[2] || 0;
+                    }
+                },{
+                    name: '__taskCountPct',
+                    defaultValue: [0,0,0],
+                    sortType: function(value) {
+                        return value && value[2] || 0;
+                    }
+                }];
 
                 var new_model = Ext.define(newModelName, {
                     extend: model,
@@ -86,6 +98,19 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         this.set('__taskToDo', taskToDo);
                         this.set('__taskEstimate', taskEstimate);
                         this.set('__taskCount', taskCount);
+
+                        var totalEstimate =  Ext.Array.sum(taskEstimate),
+                            totalCount = Ext.Array.sum(taskCount),
+                            taskCountPct = [0,0,0],
+                            taskEstimatePct = [0,0,0];
+
+                        for (var i=0; i<3; i++){
+                            if (totalCount > 0){taskCountPct[i] = taskCount[i]/totalCount * 100};
+                            if (totalEstimate > 0) {taskEstimatePct[i] = taskEstimate[i]/totalEstimate * 100};
+                        }
+
+                        this.set('__taskCountPct', taskCountPct);
+                        this.set('__taskEstimatePct', taskEstimatePct);
 
                         return { todo: taskToDo, count: taskCount, estimate: taskEstimate };
 
