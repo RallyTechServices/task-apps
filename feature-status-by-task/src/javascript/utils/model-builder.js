@@ -64,7 +64,8 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                         var taskCount = [0, 0, 0],
                             taskEstimate = [0, 0, 0],
-                            taskToDo = [0, 0, 0];
+                            taskToDo = [0, 0, 0],
+                            taskCompleted = 0;
 
                         if (snaps && snaps.length > 0) {
 
@@ -88,6 +89,9 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                                     if (stateIdx < 2){
                                         est = Math.max(est, snap.ToDo || 0);
                                         taskToDo[stateIdx] += (snap.ToDo || 0);
+                                        taskCompleted += est - (snap.ToDo || 0);
+                                    } else {
+                                        taskCompleted += est;
                                     }
                                     taskEstimate[stateIdx] += est;
                                 }
@@ -106,7 +110,13 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                         for (var i=0; i<3; i++){
                             if (totalCount > 0){taskCountPct[i] = taskCount[i]/totalCount * 100};
-                            if (totalEstimate > 0) {taskEstimatePct[i] = taskEstimate[i]/totalEstimate * 100};
+                            if (totalEstimate > 0) {
+                                if (i === 2){
+                                    taskEstimatePct[i] = taskCompleted/totalEstimate * 100
+                                } else {
+                                    taskEstimatePct[i] = taskToDo[i]/totalEstimate * 100
+                                }
+                            };
                         }
 
                         this.set('__taskCountPct', taskCountPct);

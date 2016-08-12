@@ -57,69 +57,43 @@ Ext.define("feature-status-by-task", {
 
         var idx = 0;
         var groupByFields = this.groupByFields;
-        //ct.add({
-        //    xtype: 'rallyfieldcombobox',
-        //    fieldLabel: 'Group by',
-        //    labelAlign: 'right',
-        //    itemId: 'cbGroupBy',
-        //    margin: this.margin,
-        //    labelWidth: this.labelWidth[idx],
-        //    width: this.controlWidth[idx++],
-        //    allowNoEntry: true,
-        //    noEntryText: "Feature",
-        //    stateful: true,
-        //    stateId: this.getContext().getScopedStateId('fts-GroupBy'),
-        //    //disabled: true,
-        //    model: this.getModelName(),
-        //    _isNotHidden: function(field){
-        //        if (Ext.Array.contains(groupByFields, field.name)){
-        //            return true;
-        //        }
-        //        return false;
-        //    }
-        //});
 
-       var filterBox = this.down('#filter_box_4').add({
+       var filterBox = this.down('#filter_box_3').add({
             xtype: 'standalonefilter',
             context: this.getContext(),
-            flex: 1,
-            layout: 'hbox',
-            items: [{
-                xtype: 'rallyfieldcombobox',
-                fieldLabel: 'Group by',
-                labelAlign: 'right',
-                itemId: 'cbGroupBy',
-                margin: this.margin,
-                labelWidth: this.labelWidth[idx],
-                width: this.controlWidth[idx++],
-                allowNoEntry: true,
-                noEntryText: "Feature",
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('fts-GroupBy'),
-                //disabled: true,
-                model: this.getModelName(),
-                _isNotHidden: function(field){
-                    if (Ext.Array.contains(groupByFields, field.name)){
-                        return true;
-                    }
-                    return false;
-                }
-            },{
-                itemId: 'header',
-                xtype: 'rallyleftright',
-                padding: '4 10',
-                overflowX: 'hidden'
-            },{
-               xtype: 'rallybutton',
-               margin: '0 5 0 25',
-               text: 'Update',
-               width: 100,
+            flex: 1
+        });
 
-               listeners: {
-                   click: this.updateView,
-                   scope: this
-               }
-           }]
+        filterBox.getLeft().add({
+            xtype: 'rallyfieldcombobox',
+            fieldLabel: 'Group by',
+            labelAlign: 'right',
+            itemId: 'cbGroupBy',
+            margin: this.margin,
+            labelWidth: this.labelWidth[idx],
+            width: this.controlWidth[idx++],
+            allowNoEntry: true,
+            noEntryText: "Feature",
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-GroupBy'),
+            model: this.getModelName(),
+            _isNotHidden: function(field){
+                if (Ext.Array.contains(groupByFields, field.name)){
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        filterBox.getRight().add({
+            xtype: 'rallybutton',
+            margin: '0 5 0 25',
+            text: 'Update',
+            width: 100,
+            listeners: {
+                click: this.updateView,
+                scope: this
+            }
         });
 
         //ct.add({
@@ -857,35 +831,48 @@ Ext.define("feature-status-by-task", {
         return ids;
     },
     getFeatureFilters: function(){
-        var milestoneFilter = null;
+
+        var featureFilters = this.down('standalonefilter').getCustomFilter(),
+            filters = [];
+
+        if (featureFilters){
+            filters.push(featureFilters);
+            this.logger.log('fetFeatureFilters', featureFilters.toString());
+        }
+
         var milestones = this.down('#featureMilestones') && this.down('#featureMilestones').getValue();
         if (milestones && milestones.length > 0){
-            milestoneFilter = Ext.Array.map(milestones, function(m){
+            var milestoneFilter = Ext.Array.map(milestones, function(m){
                 return {
                     property: "Milestones",
                     value: m.get('_ref')
                 };
             });
             milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
+            filters.push(milestoneFilter);
             this.logger.log('getFeatureFilters milestoneFilter', milestoneFilter.toString());
         }
 
         var featureOwner = this.down('#usrFeatureOwner') && this.down('#usrFeatureOwner').getValue(),
             featureOwnerFilter = null;
         this.logger.log('getFeatureFilters',featureOwner);
+
         if (featureOwner){
             featureOwnerFilter = Ext.create('Rally.data.wsapi.Filter',{
-                property: 'Owner',
+                property: 'Owner.ObjectID',
                 value: featureOwner
             });
             this.logger.log('getFeatureFilters featureOwnerFilter', featureOwnerFilter.toString());
 
-            if (milestoneFilter){
-                return featureOwnerFilter.and(milestoneFilter);
-            }
-            return featureOwnerFilter;
+            filters.push(featureOwnerFilter);
         }
-        return milestoneFilter;
+
+        if (filters.length > 0){
+            filters = Rally.data.wsapi.Filter.and(filters);
+            this.logger.log('getFeatureFilters',filters.toString());
+            return filters;
+        }
+        return [];
     },
     getFeatureFetchList: function(){
         var fetch =  ['ObjectID','FormattedID','Name'];
