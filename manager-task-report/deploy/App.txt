@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Jul 28 2016 09:45:13 GMT-0600 (MDT) -->
+    <!--  Build Date: Sun Aug 14 2016 16:27:20 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Jul 28 2016 09:45:13 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sun Aug 14 2016 16:27:20 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 98958866469;
+        var CHECKSUM = 99292741911;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1931,21 +1931,24 @@ Ext.define("manager-task-report", {
                 dataIndex: 'displayName',
                 flex: 1
             },{
-                text:'Defined',
+                text:'# Tasks Defined',
                 menuDisabled: true,
                 dataIndex:'numDefined'
             },{
-                text:'In Progress',
+                text:'# Tasks In Progress',
                 menuDisabled: true,
                 dataIndex:'numInProgress'
             },{
-                text:'Completed',
+                text:'# Tasks Completed',
                 menuDisabled: true,
                 dataIndex:'numCompleted'
             },{
-                text: 'Total ToDo',
+                text: 'Total ToDo (Wks)',
                 menuDisabled: true,
-                dataIndex: 'ToDo'
+                dataIndex: 'ToDo',
+                renderer: function(v){
+                    return Number(v/40).toFixed(1);
+                }
             },{
                 text: '%Complete (Count)',
                 dataIndex: 'pctCompleteCount',
@@ -1981,10 +1984,10 @@ Ext.define("manager-task-report", {
                 menuDisabled: true,
                 renderer: function(value,meta_data,item) {
                     if (value < 0){
-                        return '<div class="icon-down"></div>' + Math.abs(value);
+                        return '<div class="icon-down"></div>' + Math.abs(value) + ' H';
                     }
                     if (value > 0){
-                        return '<div class="icon-up"></div>' + value;
+                        return '<div class="icon-up"></div>' + value + ' H';
                     }
                     return 'No Change';
                 }
