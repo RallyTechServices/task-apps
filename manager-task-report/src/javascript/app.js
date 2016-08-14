@@ -757,21 +757,24 @@ Ext.define("manager-task-report", {
                 dataIndex: 'displayName',
                 flex: 1
             },{
-                text:'Defined',
+                text:'# Tasks Defined',
                 menuDisabled: true,
                 dataIndex:'numDefined'
             },{
-                text:'In Progress',
+                text:'# Tasks In Progress',
                 menuDisabled: true,
                 dataIndex:'numInProgress'
             },{
-                text:'Completed',
+                text:'# Tasks Completed',
                 menuDisabled: true,
                 dataIndex:'numCompleted'
             },{
-                text: 'Total ToDo',
+                text: 'Total ToDo (Wks)',
                 menuDisabled: true,
-                dataIndex: 'ToDo'
+                dataIndex: 'ToDo',
+                renderer: function(v){
+                    return Number(v/40).toFixed(1);
+                }
             },{
                 text: '%Complete (Count)',
                 dataIndex: 'pctCompleteCount',
@@ -807,10 +810,10 @@ Ext.define("manager-task-report", {
                 menuDisabled: true,
                 renderer: function(value,meta_data,item) {
                     if (value < 0){
-                        return '<div class="icon-down"></div>' + Math.abs(value);
+                        return '<div class="icon-down"></div>' + Math.abs(value) + ' H';
                     }
                     if (value > 0){
-                        return '<div class="icon-up"></div>' + value;
+                        return '<div class="icon-up"></div>' + value + ' H';
                     }
                     return 'No Change';
                 }

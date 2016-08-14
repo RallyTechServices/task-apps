@@ -3,10 +3,10 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 08 2016 20:33:51 GMT-0600 (MDT) -->
+    <!--  Build Date: Sun Aug 14 2016 16:17:12 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 08 2016 20:33:51 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sun Aug 14 2016 16:17:12 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -91,6 +91,27 @@
 
 .x-column-header-text {
     font-size: 12px!important;
+}
+
+.grouped-row .x-grid-cell {
+    background-color: #D6D6D6;
+    border-bottom-width:1px!important;
+    border-bottom-color: #E6E6E6;
+}
+
+.included-task .x-grid-cell{
+    background-color: #E7E6B6!important;
+}
+
+.missing-task-estimates {
+    width: 0;
+    height: 0;
+    border-top: 7px solid #EE1C25;
+    border-right: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
     </style>
 
