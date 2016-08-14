@@ -19,8 +19,17 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             if (this.field === '__taskToDo'){
                 return '#808080';
             }
-            var colors = ['#FF8200','#7CAFD7','#8DC63F'];
+            var colors = ['#FBB990','#7CAFD7','#8DC63F'];
             return colors[stateIdx];
+        },
+        getTooltip: function(values){
+            if (this.showDangerNotificationFn(values)){
+                return Ext.String.format('{0} missing Task Estimates', values && values.__missingEstimates);
+            }
+            return '';
+        },
+        showDangerNotificationFn: function(recordData) {
+            return this.field === '__taskEstimatePct' && recordData && recordData.__missingEstimates > 0;
         },
         getContainerClass: function(recordData) {
             return '';
@@ -86,8 +95,12 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
     constructor: function(config) {
         var templateConfig = config && config.template || [
                 '<tpl>',
-                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
-                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(0)]}; width: {[this.calculateWidth(values,0)]}; ">{[this.getText(values,0)]}</div>',
+                '<div data-qtip="{[this.getTooltip(values)]}" class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(0)]}; width: {[this.calculateWidth(values,0)]}; ">',
+                '<tpl if="this.showDangerNotificationFn(values)">',
+                '<div class="missing-task-estimates"></div>',
+                '</tpl>',
+                '{[this.getText(values,0)]}</div>',
                 '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(1)]}; width: {[this.calculateWidth(values,1)]}; ">{[this.getText(values,1)]}</div>',
                 '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(2)]}; width: {[this.calculateWidth(values,2)]}; ">{[this.getText(values,2)]}</div>',
                 '</div>',

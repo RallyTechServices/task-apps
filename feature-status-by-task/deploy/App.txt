@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Aug 12 2016 15:21:30 GMT-0600 (MDT) -->
+    <!--  Build Date: Sun Aug 14 2016 16:17:11 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Aug 12 2016 15:21:30 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Sun Aug 14 2016 16:17:11 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 146842807439;
+        var CHECKSUM = 147640857643;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -631,7 +631,7 @@ Ext.define('CArABU.technicalservices.StandaloneFilter',{
         return null;
     },
     applyCustomFilter: function(filterObj){
-        console.log('applyCustomFilter', filterObj);
+       // console.log('applyCustomFilter', filterObj);
         this.customFilter = filterObj && filterObj.filters;
     }
 });
@@ -675,6 +675,9 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     sortType: function(value) {
                         return value && value[2] || 0;
                     }
+                },{
+                    name: '__missingEstimates',
+                    defaultValue: 0
                 }];
 
                 var new_model = Ext.define(newModelName, {
@@ -702,7 +705,8 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         var taskCount = [0, 0, 0],
                             taskEstimate = [0, 0, 0],
                             taskToDo = [0, 0, 0],
-                            taskCompleted = 0;
+                            taskCompleted = 0,
+                            missingEstimates = 0;
 
                         if (snaps && snaps.length > 0) {
 
@@ -722,6 +726,10 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                                 if (includeTask){
                                     taskCount[stateIdx]++;
+                                    if (!snap.Estimate){
+                                        console.log('snap',snap, snap.Estimate);
+                                        missingEstimates++;
+                                    }
                                     var est = snap.Estimate || 0;
                                     if (stateIdx < 2){
                                         est = Math.max(est, snap.ToDo || 0);
@@ -734,11 +742,12 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                                 }
                             }
                         }
-                        this.logger.log('calculateRollups', this.get('FormattedID'), taskCount, taskEstimate, taskToDo);
+                        this.logger.log('calculateRollups', this.get('FormattedID'), missingEstimates, taskCount, taskEstimate, taskToDo);
 
                         this.set('__taskToDo', taskToDo);
                         this.set('__taskEstimate', taskEstimate);
                         this.set('__taskCount', taskCount);
+                        this.set('__missingEstimates', missingEstimates);
 
                         var totalEstimate =  Ext.Array.sum(taskEstimate),
                             totalCount = Ext.Array.sum(taskCount),
@@ -760,15 +769,7 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         this.set('__taskEstimatePct', taskEstimatePct);
 
                         return { todo: taskToDo, count: taskCount, estimate: taskEstimate };
-
-                        //'__pctTaskEstimate'
-                        //'__pctTaskCount'
-                    },
-                    //updateTotals: function(totalToDo, totalCount, totalEstimate){
-                    //    this.set('__totalToDo', totalToDo);
-                    //    this.set('__totalEstimate', totalEstimate);
-                    //    this.set('__totalCount', totalCount);
-                    //}
+                    }
                 });
                 deferred.resolve(new_model);
             }
@@ -907,8 +908,17 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             if (this.field === '__taskToDo'){
                 return '#808080';
             }
-            var colors = ['#FF8200','#7CAFD7','#8DC63F'];
+            var colors = ['#FBB990','#7CAFD7','#8DC63F'];
             return colors[stateIdx];
+        },
+        getTooltip: function(values){
+            if (this.showDangerNotificationFn(values)){
+                return Ext.String.format('{0} missing Task Estimates', values && values.__missingEstimates);
+            }
+            return '';
+        },
+        showDangerNotificationFn: function(recordData) {
+            return this.field === '__taskEstimatePct' && recordData && recordData.__missingEstimates > 0;
         },
         getContainerClass: function(recordData) {
             return '';
@@ -974,8 +984,12 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
     constructor: function(config) {
         var templateConfig = config && config.template || [
                 '<tpl>',
-                '<div class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
-                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(0)]}; width: {[this.calculateWidth(values,0)]}; ">{[this.getText(values,0)]}</div>',
+                '<div data-qtip="{[this.getTooltip(values)]}" class="progress-bar-container {[this.getClickableClass()]} {[this.getContainerClass(values)]}" style="{[this.getDimensionStyle()]}">',
+                '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(0)]}; width: {[this.calculateWidth(values,0)]}; ">',
+                '<tpl if="this.showDangerNotificationFn(values)">',
+                '<div class="missing-task-estimates"></div>',
+                '</tpl>',
+                '{[this.getText(values,0)]}</div>',
                 '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(1)]}; width: {[this.calculateWidth(values,1)]}; ">{[this.getText(values,1)]}</div>',
                 '<div class="rly-progress-bar" style="text-align:center;background-color: {[this.calculateColorFn(2)]}; width: {[this.calculateWidth(values,2)]}; ">{[this.getText(values,2)]}</div>',
                 '</div>',
@@ -1345,17 +1359,6 @@ Ext.define("feature-status-by-task", {
             }
         });
 
-        //ct.add({
-        //    xtype: 'rallybutton',
-        //    margin: '0 5 0 25',
-        //    text: 'Update',
-        //    width: 100,
-        //
-        //    listeners: {
-        //        click: this.updateView,
-        //        scope: this
-        //    }
-        //});
 
     },
     addMilestonesBox: function(){
@@ -1650,7 +1653,7 @@ Ext.define("feature-status-by-task", {
         this.logger.log('buildSummaryBar', totalFeatures, totalToDo, totalEstimate, totalCount);
 
         var colorData = [{
-            color: '#FF8200',
+            color: '#FBB990',
             label: 'Defined'
         },{
             color: '#7CAFD7',
@@ -1893,11 +1896,6 @@ Ext.define("feature-status-by-task", {
             xtype: 'templatecolumn',
             dataIndex: 'FormattedID',
             tpl: 'Rally.ui.renderer.template.FormattedIDTemplate'
-            //renderer: function(v,m,r){
-            //    var tpl = Ext.create('Rally.ui.renderer.template.FormattedIDTemplate');
-            //    tpl.apply(r.getData());
-            //    return tpl;
-            //}
         },{
             dataIndex: 'Name',
             text: 'Name',
@@ -2017,17 +2015,6 @@ Ext.define("feature-status-by-task", {
                         enableRanking: false,
                         columnCfgs: this.getStoryColumnCfgs(),
                         derivedColumns: this.getAdditionalStoryColumnCfgs(),
-                        //viewConfig: {
-                        //    //getRowClass: function(record) {
-                        //    //    if (record.get('_type') === 'task') {
-                        //    //        var ownerID = record.get('Owner') && record.get('Owner').ObjectID || 0;
-                        //    //        if (!taskOwners || taskOwners.length === 0 || Ext.Array.contains(taskOwners, ownerID)){
-                        //    //            return 'included-task';
-                        //    //        }
-                        //    //    }
-                        //    //    return '';
-                        //    //}
-                        //}
                         viewConfig: {
                             xtype: 'rallytreeview',
                             enableTextSelection: false,
@@ -2151,39 +2138,39 @@ Ext.define("feature-status-by-task", {
         });
         return deferred;
     },
-    buildGrid: function(store){
-
-        store.on('load', this.fetchCalculatedData, this);
-
-        this.getGridBox().add({
-            xtype: 'rallygridboard',
-            context: this.getContext(),
-            modelNames: this.getModelNames(),
-            toggleState: 'grid',
-            stateful: false,
-            stateId: 'grid1',
-            plugins: [
-                this.getFilterPlugin(),
-                this.getFieldPickerPlugin()
-            ],
-            gridConfig: {
-                store: store,
-                stateId: 'treegrid1',
-                stateful: true,
-                enableRanking: false,
-                enableBulkEdit: false,
-                enableEditing: false,
-                folderSort: false,
-                shouldShowRowActionsColumn: false,
-                columnCfgs: this.getColumnCfgs(),
-                derivedColumns: this.getCalculatedColumns()
-            },
-            height: this.getHeight(),
-            width: '100%',
-            flex: 1
-        });
-
-    },
+    //buildGrid: function(store){
+    //
+    //    store.on('load', this.fetchCalculatedData, this);
+    //
+    //    this.getGridBox().add({
+    //        xtype: 'rallygridboard',
+    //        context: this.getContext(),
+    //        modelNames: this.getModelNames(),
+    //        toggleState: 'grid',
+    //        stateful: false,
+    //        stateId: 'grid1',
+    //        plugins: [
+    //            this.getFilterPlugin(),
+    //            this.getFieldPickerPlugin()
+    //        ],
+    //        gridConfig: {
+    //            store: store,
+    //            stateId: 'treegrid1',
+    //            stateful: true,
+    //            enableRanking: false,
+    //            enableBulkEdit: false,
+    //            enableEditing: false,
+    //            folderSort: false,
+    //            shouldShowRowActionsColumn: false,
+    //            columnCfgs: this.getColumnCfgs(),
+    //            derivedColumns: this.getCalculatedColumns()
+    //        },
+    //        height: this.getHeight(),
+    //        width: '100%',
+    //        flex: 1
+    //    });
+    //
+    //},
     getStoryDetailFilters: function(){
         var filters = this.getStoryFilters();
 
@@ -2275,21 +2262,21 @@ Ext.define("feature-status-by-task", {
         }
         return null;
     },
-    fetchCalculatedData: function(store, node, featureRecords, success){
-        this.logger.log('fetchCalculatedData', featureRecords);
-        var storyFilters = this.getStoryFilters(),
-            taskOwners = this.getTaskOwners();
-        //task remaining (weeks)
-        //task estimate weeks by state
-        //% task estimate
-        //# tasks
-        //% # tasks
-        Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords, storyFilters, taskOwners).then({
-            success: this.updateSummary,
-            failure: this.showError,
-            scope: this
-        });
-    },
+    //fetchCalculatedData: function(store, node, featureRecords, success){
+    //    this.logger.log('fetchCalculatedData', featureRecords);
+    //    var storyFilters = this.getStoryFilters(),
+    //        taskOwners = this.getTaskOwners();
+    //    //task remaining (weeks)
+    //    //task estimate weeks by state
+    //    //% task estimate
+    //    //# tasks
+    //    //% # tasks
+    //    Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords, storyFilters, taskOwners).then({
+    //        success: this.updateSummary,
+    //        failure: this.showError,
+    //        scope: this
+    //    });
+    //},
     showError: function(msg){
         this.logger.log('showError', msg);
         Rally.ui.notify.Notifier.showError({message: msg});
@@ -2425,35 +2412,35 @@ Ext.define("feature-status-by-task", {
         }
 
     },
-    getCalculatedColumns: function(){
-        var columns = [{
-            xtype: 'taskremainingcolumn',
-            text: "Task ToDo (wks)",
-            granularity: 'week',
-            field: 'todo'
-        },{
-            xtype: 'taskprogresscolumn',
-            text: "Task Estimate (wks)",
-            granularity: 'week',
-            field: 'taskEstimate'
-        },{
-            xtype: 'taskprogresscolumn',
-            text: "% Task Estimate",
-            field: 'taskEstimate',
-            percent: true
-        },{
-            xtype: 'taskprogresscolumn',
-            text: "# Tasks",
-            field: 'taskCount'
-        },{
-            xtype: 'taskprogresscolumn',
-            text: "% #Tasks",
-            field: 'taskCount',
-            percent: true
-
-        }];
-        return columns;
-    },
+    //getCalculatedColumns: function(){
+    //    var columns = [{
+    //        xtype: 'taskremainingcolumn',
+    //        text: "Task ToDo (wks)",
+    //        granularity: 'week',
+    //        field: 'todo'
+    //    },{
+    //        xtype: 'taskprogresscolumn',
+    //        text: "Task Estimate (wks)",
+    //        granularity: 'week',
+    //        field: 'taskEstimate'
+    //    },{
+    //        xtype: 'taskprogresscolumn',
+    //        text: "% Task Estimate",
+    //        field: 'taskEstimate',
+    //        percent: true
+    //    },{
+    //        xtype: 'taskprogresscolumn',
+    //        text: "# Tasks",
+    //        field: 'taskCount'
+    //    },{
+    //        xtype: 'taskprogresscolumn',
+    //        text: "% #Tasks",
+    //        field: 'taskCount',
+    //        percent: true
+    //
+    //    }];
+    //    return columns;
+    //},
     getFilterPlugin: function(){
         return {
             ptype: 'rallygridboardinlinefiltercontrol',
@@ -2598,6 +2585,17 @@ Ext.define("feature-status-by-task", {
 
 .included-task .x-grid-cell{
     background-color: #E7E6B6!important;
+}
+
+.missing-task-estimates {
+    width: 0;
+    height: 0;
+    border-top: 7px solid #EE1C25;
+    border-right: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
     </style>
 

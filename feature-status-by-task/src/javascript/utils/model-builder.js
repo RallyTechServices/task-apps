@@ -38,6 +38,9 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     sortType: function(value) {
                         return value && value[2] || 0;
                     }
+                },{
+                    name: '__missingEstimates',
+                    defaultValue: 0
                 }];
 
                 var new_model = Ext.define(newModelName, {
@@ -65,7 +68,8 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         var taskCount = [0, 0, 0],
                             taskEstimate = [0, 0, 0],
                             taskToDo = [0, 0, 0],
-                            taskCompleted = 0;
+                            taskCompleted = 0,
+                            missingEstimates = 0;
 
                         if (snaps && snaps.length > 0) {
 
@@ -85,6 +89,10 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
 
                                 if (includeTask){
                                     taskCount[stateIdx]++;
+                                    if (!snap.Estimate){
+                                        console.log('snap',snap, snap.Estimate);
+                                        missingEstimates++;
+                                    }
                                     var est = snap.Estimate || 0;
                                     if (stateIdx < 2){
                                         est = Math.max(est, snap.ToDo || 0);
@@ -97,11 +105,12 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                                 }
                             }
                         }
-                        this.logger.log('calculateRollups', this.get('FormattedID'), taskCount, taskEstimate, taskToDo);
+                        this.logger.log('calculateRollups', this.get('FormattedID'), missingEstimates, taskCount, taskEstimate, taskToDo);
 
                         this.set('__taskToDo', taskToDo);
                         this.set('__taskEstimate', taskEstimate);
                         this.set('__taskCount', taskCount);
+                        this.set('__missingEstimates', missingEstimates);
 
                         var totalEstimate =  Ext.Array.sum(taskEstimate),
                             totalCount = Ext.Array.sum(taskCount),
@@ -123,15 +132,7 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                         this.set('__taskEstimatePct', taskEstimatePct);
 
                         return { todo: taskToDo, count: taskCount, estimate: taskEstimate };
-
-                        //'__pctTaskEstimate'
-                        //'__pctTaskCount'
-                    },
-                    //updateTotals: function(totalToDo, totalCount, totalEstimate){
-                    //    this.set('__totalToDo', totalToDo);
-                    //    this.set('__totalEstimate', totalEstimate);
-                    //    this.set('__totalCount', totalCount);
-                    //}
+                    }
                 });
                 deferred.resolve(new_model);
             }

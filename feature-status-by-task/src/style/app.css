@@ -76,3 +76,14 @@
 .included-task .x-grid-cell{
     background-color: #E7E6B6!important;
 }
+
+.missing-task-estimates {
+    width: 0;
+    height: 0;
+    border-top: 7px solid #EE1C25;
+    border-right: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
