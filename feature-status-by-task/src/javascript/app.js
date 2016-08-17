@@ -570,7 +570,14 @@ Ext.define("feature-status-by-task", {
             fields: featureRecords[0].getFields()
         });
 
-        var hash = {};
+        var hash = {},
+            displayGroup = {};
+
+        var otherGroupBy = this.groupByFields[0];
+        if (groupBy === this.groupByFields[0]){
+            otherGroupBy = this.groupByFields[1];
+        }
+
         Ext.Array.each(featureRecords, function(f){
             var groupValue = f.get(groupBy) || "None";
             if (!hash[groupValue]) {
@@ -580,9 +587,17 @@ Ext.define("feature-status-by-task", {
             childData.children = [];
             childData.leaf = true;
             hash[groupValue].push(Ext.create(treeModel, childData));
+
+            if (!displayGroup[groupValue]){
+                displayGroup[groupValue] = [];
+            }
+            if (!Ext.Array.contains(displayGroup[groupValue],childData[otherGroupBy])){
+                displayGroup[groupValue].push(childData[otherGroupBy]);
+            }
+
         });
 
-        this.logger.log('buildTreeStore', hash);
+        this.logger.log('buildTreeStore', hash, displayGroup);
         var data = [];
         var maxToDo = 0,
             maxEstimate = 0,
@@ -605,9 +620,11 @@ Ext.define("feature-status-by-task", {
 
             var fields = {children: children, leaf: false};
             fields[groupBy] = key;
+            fields[otherGroupBy] = displayGroup[key];
             fields.__taskCount = taskCount;
             fields.__taskEstimate = taskEstimate;
             fields.__taskToDo = taskToDo;
+
             data.push(Ext.create(treeModel, fields));
         });
 
@@ -652,12 +669,6 @@ Ext.define("feature-status-by-task", {
                 var feature = record.get('Feature')
                 return this.tpl.apply({name: feature && feature.Owner && feature.Owner.DisplayName || "" });
             }
-            //renderer: function(v,m,r){
-            //    if (v){
-            //        return v.Owner.DisplayName;
-            //    }
-            //    return '';
-            //}
         },{
             xtype: 'templatecolumn',
             text: "Feature QE Owner",
@@ -787,6 +798,13 @@ Ext.define("feature-status-by-task", {
     getGroupByField: function(){
         return this.down('#cbGroupBy') && this.down('#cbGroupBy').getValue() || null;
     },
+    getOtherGroupByField: function(){
+
+        if (this.getGroupByField() === this.groupByFields[0]){
+            return this.groupByFields[1];
+        }
+        return this.groupByFields[0];
+    },
     getGroupByDisplayName: function(){
         var cb = this.down('#cbGroupBy');
         return cb && cb.getRecord() &&
@@ -848,9 +866,9 @@ Ext.define("feature-status-by-task", {
         return [];
     },
     getFeatureFetchList: function(){
-        var fetch =  ['ObjectID','FormattedID','Name'];
+        var fetch =  ['ObjectID','FormattedID','Name','Owner'];
         if (this.getGroupByField()){
-            fetch.push(this.getGroupByField());
+            fetch = fetch.concat(this.groupByFields);
         }
         return fetch;
     },
@@ -1022,7 +1040,8 @@ Ext.define("feature-status-by-task", {
 
         var columns = [];
 
-        var groupBy = this.getGroupByField();
+        var groupBy = this.getGroupByField(),
+            otherGroupBy = this.getOtherGroupByField();
         var totalWidth = 450,
             treeColumnWidth = 0,
             idAndNameSortable = true ;
@@ -1039,8 +1058,20 @@ Ext.define("feature-status-by-task", {
                 width: treeColumnWidth,
                 renderer: function(v,m,r){
                     //We don't want to show this field if this is a leaf node.
-                    if (!r.get('FormattedID')){
-                        return v;
+                    if (!r.get('FormattedID')) {
+                        var val = r.get(groupBy),
+                            otherVals = r.get(otherGroupBy) || [];
+                        console.log('othervals', val, otherVals);
+                        var x = val;
+                        if (!Ext.isArray(otherVals)){
+                            x = Ext.String.format("{0} - {1}", val, otherVals);
+                        } else if(otherVals.length === 1) {
+                           x = Ext.String.format("{0} - {1}", val, otherVals[0]);
+                        } else {
+                           x = Ext.String.format("{0} - {1}", val, otherVals.join(','));
+                        }
+                        console.log('x',x);
+                        return x;
                     }
                     return '';
                 }
@@ -1073,6 +1104,9 @@ Ext.define("feature-status-by-task", {
                 metadata.style = 'cursor: pointer;';
                 return val;
             }
+        },{
+            dataIndex: 'Owner',
+            text: 'Owner'
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,
