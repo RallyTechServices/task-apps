@@ -154,73 +154,34 @@ Ext.override(Rally.ui.combobox.UserComboBox, {
     }
 });
 
-//Ext.override(Rally.ui.picker.MilestonePicker,{
-//    getState: function(){
-//        console.log('getState', this.getValue());
-//        var refArray = Ext.Array.map(this.getValue(), function(m){
-//            return m.get('_ref');
-//        });
-//        return {value: refArray};
-//    },
-//    applyState: function(state) {
-//        console.log('applystate', state.value);
-//        //this.callParent(arguments);
-//        if(state.hasOwnProperty('value')) {
-//            this.setValue(state.value);
-//        }
-//
-//        this.on('expand', function () {
-//            this.setValue(state.value);
-//            this.saveState();
-//        }, this, {single: true});
-//
-//        if (this.value !== state.value){
-//            this.expand();
-//        }
-//
-//
-//    },
-//    setValue: function(values) {
-//        if (values && values.length > 0){
-//            var items = values;
-//            //var items = Ext.isString(values) ? values.split(',') : Ext.Array.from(values);
-//
-//            items = Ext.Array.merge(items, this.alwaysSelectedValues);
-//            console.log('setvalue', items);
-//            if (!Ext.isEmpty(items) && this.store && this.store.isLoading()) {
-//                this.store.on('load', function() {
-//                    this._selectValues(items);
-//                }, this, {single: true});
-//            }
-//            else {
-//                this._selectValues(items);
-//            }
-//        }
-//
-//    },
-//    _selectValues: function (items) {
-//        var oldValue = this.selectedValues.getRange();
-//        this.selectedValues.clear();
-//        console.log('_selectValues', this.selectionKey, oldValue, items);
-//        _.each(items, function (item) {
-//            var value = item && item.isModel ? item.get(this.selectionKey) : item;
-//            var record = this.findInStore(value);
-//            console.log('record', record);
-//            if (record) {
-//                this.selectedValues.add(this._getKey(record), record);
-//            } else if (item.isModel) {
-//                this.selectedValues.add(value, item);
-//            }
-//        }, this);
-//
-//        if (this.isExpanded) {
-//            this._onListRefresh();
-//            this._groupSelectedRecords();
-//        } else {
-//            this._syncSelection();
-//        }
-//
-//        this.fireEvent('change', this, this.selectedValues.getRange(), oldValue);
-//    },
-//
-//});
+Ext.override(Rally.ui.picker.MilestonePicker,{
+    getState: function(){
+        var refArray = Ext.Array.map(this.getValue(), function(m){
+            return m.get('_ref');
+        });
+        return {value: refArray};
+    },
+    applyState: function(state) {
+        var pk = this;
+        if (state.value && state.value.length > 0 && this.getValue() != state.value){
+            var filters = Ext.Array.map(state.value, function(f){
+                return {
+                    property: 'ObjectID',
+                    value: Rally.util.Ref.getOidFromRef(f)
+                }
+            });
+            Ext.create('Rally.data.wsapi.Store',{
+                model: 'Milestone',
+                fetch: ['Name','TargetDate'],
+                filters: Rally.data.wsapi.Filter.or(filters)
+            }).load({
+                callback: function(records){
+                    Ext.Array.each(records, function(r){
+                        pk.select(r);
+                    });
+                    pk.syncSelectionText();
+                }
+            });
+        }
+    }
+});

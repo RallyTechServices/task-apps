@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Aug 18 2016 13:55:17 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Aug 18 2016 15:43:42 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Aug 18 2016 13:55:17 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Aug 18 2016 15:43:42 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 157833554616;
+        var CHECKSUM = 151035096839;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -943,76 +943,37 @@ Ext.override(Rally.ui.combobox.UserComboBox, {
     }
 });
 
-//Ext.override(Rally.ui.picker.MilestonePicker,{
-//    getState: function(){
-//        console.log('getState', this.getValue());
-//        var refArray = Ext.Array.map(this.getValue(), function(m){
-//            return m.get('_ref');
-//        });
-//        return {value: refArray};
-//    },
-//    applyState: function(state) {
-//        console.log('applystate', state.value);
-//        //this.callParent(arguments);
-//        if(state.hasOwnProperty('value')) {
-//            this.setValue(state.value);
-//        }
-//
-//        this.on('expand', function () {
-//            this.setValue(state.value);
-//            this.saveState();
-//        }, this, {single: true});
-//
-//        if (this.value !== state.value){
-//            this.expand();
-//        }
-//
-//
-//    },
-//    setValue: function(values) {
-//        if (values && values.length > 0){
-//            var items = values;
-//            //var items = Ext.isString(values) ? values.split(',') : Ext.Array.from(values);
-//
-//            items = Ext.Array.merge(items, this.alwaysSelectedValues);
-//            console.log('setvalue', items);
-//            if (!Ext.isEmpty(items) && this.store && this.store.isLoading()) {
-//                this.store.on('load', function() {
-//                    this._selectValues(items);
-//                }, this, {single: true});
-//            }
-//            else {
-//                this._selectValues(items);
-//            }
-//        }
-//
-//    },
-//    _selectValues: function (items) {
-//        var oldValue = this.selectedValues.getRange();
-//        this.selectedValues.clear();
-//        console.log('_selectValues', this.selectionKey, oldValue, items);
-//        _.each(items, function (item) {
-//            var value = item && item.isModel ? item.get(this.selectionKey) : item;
-//            var record = this.findInStore(value);
-//            console.log('record', record);
-//            if (record) {
-//                this.selectedValues.add(this._getKey(record), record);
-//            } else if (item.isModel) {
-//                this.selectedValues.add(value, item);
-//            }
-//        }, this);
-//
-//        if (this.isExpanded) {
-//            this._onListRefresh();
-//            this._groupSelectedRecords();
-//        } else {
-//            this._syncSelection();
-//        }
-//
-//        this.fireEvent('change', this, this.selectedValues.getRange(), oldValue);
-//    },
-//
-//});
+Ext.override(Rally.ui.picker.MilestonePicker,{
+    getState: function(){
+        var refArray = Ext.Array.map(this.getValue(), function(m){
+            return m.get('_ref');
+        });
+        return {value: refArray};
+    },
+    applyState: function(state) {
+        var pk = this;
+        if (state.value && state.value.length > 0 && this.getValue() != state.value){
+            var filters = Ext.Array.map(state.value, function(f){
+                return {
+                    property: 'ObjectID',
+                    value: Rally.util.Ref.getOidFromRef(f)
+                }
+            });
+            Ext.create('Rally.data.wsapi.Store',{
+                model: 'Milestone',
+                fetch: ['Name','TargetDate'],
+                filters: Rally.data.wsapi.Filter.or(filters)
+            }).load({
+                callback: function(records){
+                    Ext.Array.each(records, function(r){
+                        pk.select(r);
+                    });
+                    pk.syncSelectionText();
+                }
+            });
+        }
+    }
+});
 
 Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
     extend: 'Ext.XTemplate',
@@ -1500,6 +1461,7 @@ Ext.define("feature-status-by-task", {
             fieldLabel: 'Feature Milestones',
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-FeatureMilestones'),
+            stateEvents: ['select','deselect'],
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
@@ -1523,8 +1485,8 @@ Ext.define("feature-status-by-task", {
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
-            //stateful: true,
-            //stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
             stateEvents: ['select','deselect'],
             fieldLabel: 'Story Milestones',
             labelAlign: 'right',
@@ -1538,23 +1500,9 @@ Ext.define("feature-status-by-task", {
                 },
                 deselect: function(pk,value,values){
                     pk.syncSelectionText();
-                    console.log('deselect',values);
                     if (!values || values.length === 0){
                         pk.setValueText("");
                     }
-                },
-
-                beforestatesave: function(pk, state){
-                    console.log('beforestatesave',pk, state )
-                },
-                statesave: function(pk, state){
-                    console.log('statesave',pk, state )
-                },
-                staterestore: function(pk,state){
-                    console.log('staterestore',pk, state )
-                },
-                beforestaterestore: function(pk, state){
-                    console.log('beforestaterestore',pk, state )
                 }
             }
         });
@@ -1649,10 +1597,7 @@ Ext.define("feature-status-by-task", {
             valueField: "ObjectID",
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++]
-
         });
-
-
 
     },
     getExtendedModelName: function(){
@@ -2445,7 +2390,10 @@ Ext.define("feature-status-by-task", {
             }
         },{
             dataIndex: 'Owner',
-            text: 'Owner'
+            text: 'Owner',
+            renderer: function(v,m,r){
+                return v && v._refObjectName;
+            }
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,

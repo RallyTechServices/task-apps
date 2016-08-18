@@ -111,6 +111,7 @@ Ext.define("feature-status-by-task", {
             fieldLabel: 'Feature Milestones',
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-FeatureMilestones'),
+            stateEvents: ['select','deselect'],
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
@@ -134,8 +135,8 @@ Ext.define("feature-status-by-task", {
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
-            //stateful: true,
-            //stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
+            stateful: true,
+            stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
             stateEvents: ['select','deselect'],
             fieldLabel: 'Story Milestones',
             labelAlign: 'right',
@@ -149,23 +150,9 @@ Ext.define("feature-status-by-task", {
                 },
                 deselect: function(pk,value,values){
                     pk.syncSelectionText();
-                    console.log('deselect',values);
                     if (!values || values.length === 0){
                         pk.setValueText("");
                     }
-                },
-
-                beforestatesave: function(pk, state){
-                    console.log('beforestatesave',pk, state )
-                },
-                statesave: function(pk, state){
-                    console.log('statesave',pk, state )
-                },
-                staterestore: function(pk,state){
-                    console.log('staterestore',pk, state )
-                },
-                beforestaterestore: function(pk, state){
-                    console.log('beforestaterestore',pk, state )
                 }
             }
         });
@@ -260,10 +247,7 @@ Ext.define("feature-status-by-task", {
             valueField: "ObjectID",
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++]
-
         });
-
-
 
     },
     getExtendedModelName: function(){
@@ -1056,7 +1040,10 @@ Ext.define("feature-status-by-task", {
             }
         },{
             dataIndex: 'Owner',
-            text: 'Owner'
+            text: 'Owner',
+            renderer: function(v,m,r){
+                return v && v._refObjectName;
+            }
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,
