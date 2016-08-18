@@ -96,5 +96,131 @@ Ext.override(Rally.ui.combobox.TimeboxComboBox, {
         this.store.on('add', this._onStoreAdd, this);
         this.on('change', this._onChange, this);
         this.on('expand', this._onExpand, this);
-    },
+    }
 });
+
+Ext.override(Rally.ui.combobox.UserComboBox, {
+
+    applyState: function (state) {
+
+        this.store.on('load', function () {
+            this.setValue(state.value);
+            this.saveState();
+        }, this, {single: true});
+
+        if (state.value && this.value != state.value) {
+            if (this.store) {
+                this.store.addFilter([{
+                    property: 'ObjectID',
+                    value: state.value
+                }]);
+                this.refreshStore();
+            }
+        }
+    },
+
+    beforeQuery: function(queryPlan) {
+        var queryString = queryPlan.query,
+            idFilter = Rally.data.wsapi.Filter.or([
+                {
+                    property: 'UserName',
+                    operator: 'contains',
+                    value: queryString
+                },
+                {
+                    property: 'DisplayName',
+                    operator: 'contains',
+                    value: queryString
+                },
+                {
+                    property: 'FirstName',
+                    operator: 'contains',
+                    value: queryString
+                },
+                {
+                    property: 'LastName',
+                    operator: 'contains',
+                    value: queryString
+                },
+                {
+                    property: 'EmailAddress',
+                    operator: 'contains',
+                    value: queryString
+                }
+            ]);
+        queryPlan.query = idFilter.toString();
+
+        return this.callSuper(arguments);
+    }
+});
+
+//Ext.override(Rally.ui.picker.MilestonePicker,{
+//    getState: function(){
+//        console.log('getState', this.getValue());
+//        var refArray = Ext.Array.map(this.getValue(), function(m){
+//            return m.get('_ref');
+//        });
+//        return {value: refArray};
+//    },
+//    applyState: function(state) {
+//        console.log('applystate', state.value);
+//        //this.callParent(arguments);
+//        if(state.hasOwnProperty('value')) {
+//            this.setValue(state.value);
+//        }
+//
+//        this.on('expand', function () {
+//            this.setValue(state.value);
+//            this.saveState();
+//        }, this, {single: true});
+//
+//        if (this.value !== state.value){
+//            this.expand();
+//        }
+//
+//
+//    },
+//    setValue: function(values) {
+//        if (values && values.length > 0){
+//            var items = values;
+//            //var items = Ext.isString(values) ? values.split(',') : Ext.Array.from(values);
+//
+//            items = Ext.Array.merge(items, this.alwaysSelectedValues);
+//            console.log('setvalue', items);
+//            if (!Ext.isEmpty(items) && this.store && this.store.isLoading()) {
+//                this.store.on('load', function() {
+//                    this._selectValues(items);
+//                }, this, {single: true});
+//            }
+//            else {
+//                this._selectValues(items);
+//            }
+//        }
+//
+//    },
+//    _selectValues: function (items) {
+//        var oldValue = this.selectedValues.getRange();
+//        this.selectedValues.clear();
+//        console.log('_selectValues', this.selectionKey, oldValue, items);
+//        _.each(items, function (item) {
+//            var value = item && item.isModel ? item.get(this.selectionKey) : item;
+//            var record = this.findInStore(value);
+//            console.log('record', record);
+//            if (record) {
+//                this.selectedValues.add(this._getKey(record), record);
+//            } else if (item.isModel) {
+//                this.selectedValues.add(value, item);
+//            }
+//        }, this);
+//
+//        if (this.isExpanded) {
+//            this._onListRefresh();
+//            this._groupSelectedRecords();
+//        } else {
+//            this._syncSelection();
+//        }
+//
+//        this.fireEvent('change', this, this.selectedValues.getRange(), oldValue);
+//    },
+//
+//});
