@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Task Burnup</title>
+    <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
+    <!--  Build Date: Mon Aug 22 2016 12:57:14 GMT-0600 (MDT) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Mon Aug 22 2016 12:57:14 GMT-0600 (MDT)";
+        var BUILDER = "kcorkan";
+        var CHECKSUM = 6756576400;
+    </script>
+    
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Rally.ui.dialog.Dialog',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+    title: "Build Information",
+    
+    defaults: { padding: 5, margin: 5 },
+
+    closable: true,
+     
+    draggable: true,
+
+    autoShow: true,
+   
+    width: 350,
+    
+    informationalConfig: null,
+    
+    items: [{xtype:'container', itemId:'information' }],
+    
+    initComponent: function() {
+        var id = Ext.id(this);
+        this.title =  "<span class='icon-help'> </span>" + this.title;
+        this.callParent(arguments);
+    },
+    
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/var BUILDER = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+       
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+   
+        return chk;
+    },
+    
+    _checkChecksum: function(container) {
+        var deferred = Ext.create('Deft.Deferred');
+        var me = this;
+        
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    var stored_checksum = me._generateChecksum(text);
+                    if ( CHECKSUM !== stored_checksum ) {
+                        deferred.resolve(false);
+                        return;
+                    }
+                }
+                deferred.resolve(true);
+            }
+        });
+        
+        return deferred.promise;
+    },
+    
+    _addToContainer: function(container){
+        var config = Ext.apply({
+            xtype:'container',
+            height: 200,
+            overflowY: true
+        }, this.informationalConfig);
+        
+        container.add(config);
+    },
+    
+    afterRender: function() {
+        var app = Rally.getApp();
+        
+        if ( !Ext.isEmpty( this.informationalConfig ) ) {
+            var container = this.down('#information');
+            this._addToContainer(container);
+            
+        }
+        
+        if (! app.isExternal() ) {
+            this._checkChecksum(app).then({
+                scope: this,
+                success: function(result){
+                    if ( !result ) {
+                        this.addDocked({
+                            xtype:'container',
+                            cls: 'build-info',
+                            dock: 'bottom',
+                            padding: 2,
+                            html:'<span class="icon-warning"> </span>Checksums do not match'
+                        });
+                    }
+                },
+                failure: function(msg){
+                    console.log("oops:",msg);
+                }
+            });
+        } else {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html:'... Running externally'
+            });
+        }
+        this.callParent(arguments);
+    },
+    
+    beforeRender: function() {
+        var me = this;
+        this.callParent(arguments);
+
+        if (this.informationHtml) {
+            this.addDocked({
+                xtype: 'component',
+                componentCls: 'intro-panel',
+                padding: 2,
+                html: this.informationHtml,
+                doc: 'top'
+            });
+        }
+        
+        this.addDocked({
+            xtype:'container',
+            cls: 'build-info',
+            padding: 2,
+            dock:'bottom',
+            html:"This app was created by the CA AC Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            this.addDocked({
+                xtype:'container',
+                cls: 'build-info',
+                padding: 2,
+                dock: 'bottom',
+                html: Ext.String.format("Build date/time: {0} ({1})",
+                    APP_BUILD_DATE,
+                    BUILDER)
+            });
+        }
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('CArABU.technicalservices.TaskBurnupCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+    config: {
+        completedStates: ['Completed']
+    },
+
+    constructor: function (config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+
+    getDerivedFieldsOnInput: function () {
+        var completedStateNames = this.getCompletedStates();
+        return [
+            {
+                "as": "Estimated",
+                "f": function (snapshot) {
+                    if (snapshot.Estimate) {
+                        return snapshot.Estimate/40;
+                    }
+                    return 0;
+                }
+            },
+            {
+                "as": "Completed",
+                "f": function (snapshot) {
+                    if (_.contains(completedStateNames, snapshot.State) && snapshot.Estimate) {
+                        return snapshot.Estimate/40;
+                    }
+                    if (!_.contains(completedStateNames, snapshot.State) && snapshot.Estimate && snapshot.ToDo){
+                        return (snapshot.Estimate - snapshot.ToDo)/40;
+                    }
+
+                    return 0;
+                }
+            }
+        ];
+    },
+
+    getMetrics: function () {
+        return [
+            {
+                "field": "Estimated",
+                "as": "Estimated",
+                "display": "line",
+                "f": "sum"
+            },
+            {
+                "field": "Completed",
+                "as": "Completed",
+                "f": "sum",
+                "display": "column"
+            }
+        ];
+    },
+    prepareChartData: function (stores) {
+
+        console.log('store',stores);
+        var snapshots = [];
+        Ext.Array.each(stores, function(store){
+            store.each(function (record) {
+                snapshots.push(record.raw);
+            });
+        });
+        return this.runCalculation(snapshots);
+    }
+});
+Ext.define('CArABU.technicalservices.TaskCFDCalculator', {
+    extend: 'Rally.data.lookback.calculator.TimeSeriesCalculator',
+    config: {
+        stateFieldName: 'State',
+        stateFieldValues: ['Defined', 'In-Progress', 'Completed'],
+        completedStates: ['Completed']
+    },
+
+    constructor: function(config) {
+        this.initConfig(config);
+        this.callParent(arguments);
+    },
+
+    getMetrics: function() {
+
+        return [{
+            as: "Defined",
+            field: "Remaining",
+            f: "filteredSum",
+            filterField: "State",
+            filterValues: ["Defined"],
+            display: "area"
+        },{
+            as: "In-Progress",
+            field: "Remaining",
+            f: "filteredSum",
+            filterField: "State",
+            filterValues: ["In-Progress"],
+            display: "area"
+        },{
+            as: "Completed",
+            field: "Completed",
+            f: "sum",
+            display: "area"
+        }];
+
+    },
+    getDerivedFieldsOnInput: function () {
+        var completedStateNames = this.getCompletedStates();
+        return [
+            {
+                "as": "Remaining",
+                "f": function (snapshot) {
+                    if (snapshot.ToDo){
+                        return snapshot.ToDo/40;
+                    } else {
+                        return snapshot.Estimate/40;
+                    }
+                    return 0;
+                }
+            },
+            {
+                "as": "Completed",
+                "f": function (snapshot) {
+                    if (_.contains(completedStateNames, snapshot.State) && snapshot.Estimate) {
+                        return snapshot.Estimate/40;
+                    }
+                    if (!_.contains(completedStateNames, snapshot.State) && snapshot.Estimate && snapshot.ToDo){
+                        return (snapshot.Estimate - snapshot.ToDo)/40;
+                    }
+
+                    return 0;
+                }
+            }
+        ];
+    },
+    prepareChartData: function (stores) {
+
+        var snapshots = [];
+        Ext.Array.each(stores, function(store){
+            store.each(function (record) {
+                snapshots.push(record.raw);
+            });
+        });
+        return this.runCalculation(snapshots);
+    }
+});
+/**
+ * A class for displaying toggle or multiple charts that use the same data.
+ */
+Ext.define('CArABU.technicalservices.MultiChartContainer', {
+    extend: 'Rally.ui.chart.Chart',
+    alias: 'widget.multichartcontainer',
+    mixins: ['Rally.app.Scopeable'],
+
+    items: [
+        {
+            xtype: 'container',
+            itemId: 'header',
+            cls: 'header'
+        },
+        {
+            xtype: 'container',
+            itemId: 'chart',
+            cls: 'chart',
+            layout: 'fit',
+            flex: 1
+        }
+    ]
+});
+Ext.define("task-burnup", {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    defaults: { margin: 10 },
+
+    items: [
+        {xtype:'container',itemId:'selector_box', layout: 'hbox'},
+        {xtype: 'container', itemId: 'chart_header_box', layout: 'hbox'},
+        {xtype:'container',itemId:'display_box'}
+    ],
+
+    integrationHeaders : {
+        name : "task-burnup"
+    },
+
+    portfolioFeatureTypePath: 'PortfolioItem/Feature',
+    margin: 10,
+    showCFD: false,
+                        
+    launch: function() {
+        this.initializeApp();
+    },
+
+    initializeApp: function(){
+        this.logger.log('initializeApp');
+        this.addComponents();
+    },
+    getSelectorBox: function(){
+        return this.down('#selector_box');
+    },
+    getDisplayBox: function(){
+        return this.down('#display_box');
+    },
+    getChartHeader: function(){
+        return this.down('#chart_header_box');
+    },
+    addComponents: function(){
+        this.logger.log('addComponents');
+
+        this.getSelectorBox().add({
+            fieldLabel: 'Feature Milestone',
+            xtype: 'rallymilestonepicker',
+            labelAlign: 'right',
+            margin: this.margin,
+            listeners: {
+                select: function(pk){
+                    pk.syncSelectionText();
+                },
+                deselect: function(pk,value,values){
+                    pk.syncSelectionText();
+                    if (!values || values.length === 0){
+                        pk.setValueText("");
+                    }
+
+                }
+            }
+        });
+
+        var bt = this.getSelectorBox().add({
+            xtype: 'rallybutton',
+            text: 'Update',
+            margin: this.margin
+        });
+        bt.on('click', this.getFeatures, this);
+
+        this.getChartHeader().add({
+            xtype: 'container',
+            flex: 1
+        });
+
+        this.getChartHeader().add({
+            xtype: 'rallybutton',
+            iconCls: 'icon-bars',
+            itemId: 'btn-burnup',
+            cls: 'primary rly-small',
+            pressedCls: 'primary rly-small',
+            enableToggle: true,
+            pressed: true,
+            scope: this,
+            listeners: {
+                toggle: this.toggleDetail,
+                scope: this
+            }
+        });
+
+       this.getChartHeader().add({
+            xtype: 'rallybutton',
+            iconCls: 'icon-graph',
+            itemId: 'btn-cfd',
+            cls: 'secondary rly-small',
+            pressedCls: 'primary rly-small',
+            enableToggle: true,
+            scope: this,
+            pressed: false,
+           listeners: {
+                toggle: this.toggleDetail,
+                scope: this
+            }
+        });
+
+    },
+    toggleDetail: function(btn, state){
+        this.logger.log('_toggleDetail', btn.itemId, state);
+        if (state){
+            btn.removeCls('secondary');
+            btn.addCls('primary');
+        } else {
+            btn.removeCls('primary');
+            btn.addCls('secondary');
+        }
+
+        this.getFeatures();
+
+    },
+    getShowCFD: function(){
+        return this.down('#btn-cfd').pressed;
+    },
+    getShowBurnup: function(){
+        return this.down('#btn-burnup').pressed;
+    },
+    getMilestoneRefs: function(){
+        return this.down('rallymilestonepicker').getValue();
+    },
+    getFeatures: function(){
+
+        var milestones = this.getMilestoneRefs(),
+            filters = Ext.Array.map(milestones, function(m){
+                return {
+                    property: 'Milestones',
+                    value: m.get('_ref')
+                };
+            });
+            filters = Rally.data.wsapi.Filter.or(filters);
+        this.logger.log('getFeatures',milestones, filters);
+        Ext.create('Rally.data.wsapi.Store',{
+            model: this.portfolioFeatureTypePath,
+            fetch: ['ObjectID'],
+            filters: filters,
+            limit: 'Infinity'
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    this.updateView(records);
+                } else {
+                    var msg = operation.error.errors.join(',');
+                    this.showErrorNotification(msg);
+                }
+            },
+            scope: this
+        });
+
+    },
+    showErrorNotification: function(msg){
+        Rally.ui.notify.Notifier.showError({message: msg});
+    },
+    updateView: function(features){
+
+        var featureOids = Ext.Array.map(features, function(f){ return f.get('ObjectID');});
+        this.logger.log('updateView', featureOids);
+
+        this.getDisplayBox().removeAll();
+
+        if (this.getShowBurnup()){
+            this.getDisplayBox().add({
+                xtype: 'rallychart',
+                storeType: 'Rally.data.lookback.SnapshotStore',
+                storeConfig: this.getStoreConfig(featureOids),
+                calculatorType: 'CArABU.technicalservices.TaskBurnupCalculator',
+                calculatorConfig: {},
+                chartConfig: this.getChartConfig()
+            });
+        }
+
+        if (this.getShowCFD()) {
+            this.getDisplayBox().add({
+                xtype: 'rallychart',
+                storeType: 'Rally.data.lookback.SnapshotStore',
+                storeConfig: this.getStoreConfig(featureOids),
+                calculatorType: 'CArABU.technicalservices.TaskCFDCalculator',
+                calculatorConfig: {},
+                chartConfig: this.getCFDConfig() //this.getChartConfig()
+            });
+        }
+
+
+
+    },
+
+    getStoreConfig: function(featureOids) {
+        var MAX_SIZE = 25,
+            configs = [];
+
+        for (var i=0; i < featureOids.length; i = i + MAX_SIZE){
+            var chunk = Ext.Array.slice(featureOids, i, i + MAX_SIZE);
+            configs.push({
+                find: {
+                    _ItemHierarchy: {$in: chunk},
+                    _TypeHierarchy: 'Task'
+                },
+                fetch: ['State', 'ToDo','Estimate'],
+                hydrate: ['State'],
+                sort: {
+                    _ValidFrom: 1
+                },
+                context: this.getContext().getDataContext(),
+                limit: Infinity
+            });
+        }
+        return configs;
+    },
+    getCFDConfig: function(){
+        return {
+            chart: {
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Task Cumulative Flow'
+            },
+            xAxis: {
+                tickmarkPlacement: 'on',
+                tickInterval: 20,
+                title: {
+                    text: 'Date'
+                }
+            },
+            yAxis: [
+                {
+                    title: {
+                        text: 'Weeks'
+                    }
+                }
+            ],
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false
+                    }
+                },
+                area: {
+                    stacking: 'normal'
+                }
+            }
+        };
+    },
+    getChartConfig: function() {
+        return {
+            chart: {
+                defaultSeriesType: 'area',
+                zoomType: 'xy'
+            },
+            title: {
+                text: 'Task Burnup'
+            },
+            xAxis: {
+                categories: [],
+                tickmarkPlacement: 'on',
+                tickInterval: 20,
+                title: {
+                    text: 'Date',
+                    margin: 10
+                }
+            },
+            yAxis: [
+                {
+                    title: {
+                        text: 'Weeks'
+                    }
+                }
+            ],
+            tooltip: {
+                formatter: function() {
+                    return '' + this.x + '<br />' + this.series.name + ': ' + this.y;
+                }
+            },
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false,
+                        states: {
+                            hover: {
+                                enabled: true
+                            }
+                        }
+                    },
+                    groupPadding: 0.01
+                },
+                column: {
+                    stacking: null,
+                    shadow: false
+                }
+            }
+        };
+    },
+    getOptions: function() {
+        return [
+            {
+                text: 'About...',
+                handler: this._launchInfo,
+                scope: this
+            }
+        ];
+    },
+    
+    _launchInfo: function() {
+        if ( this.about_dialog ) { this.about_dialog.destroy(); }
+        this.about_dialog = Ext.create('Rally.technicalservices.InfoLink',{});
+    },
+    
+    isExternal: function(){
+        return typeof(this.getAppId()) == 'undefined';
+    },
+    
+    //onSettingsUpdate:  Override
+    onSettingsUpdate: function (settings){
+        this.logger.log('onSettingsUpdate',settings);
+        // Ext.apply(this, settings);
+        this.launch();
+    }
+});
+
+            
+               Rally.launchApp('task-burnup', {
+                   name: 'Task Burnup'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+    </style>
+
+</head>
+<body></body>
+</html>

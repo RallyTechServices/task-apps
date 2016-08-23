@@ -111,6 +111,7 @@ Ext.define("feature-status-by-task", {
             fieldLabel: 'Feature Milestones',
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-FeatureMilestones'),
+            stateEvents: ['select','deselect'],
             margin: this.margin,
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++],
@@ -136,15 +137,19 @@ Ext.define("feature-status-by-task", {
             width: this.controlWidth[idx++],
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-storyMilestones'),
+            stateEvents: ['select','deselect'],
             fieldLabel: 'Story Milestones',
             labelAlign: 'right',
+            storeConfig: {
+                autoLoad: true
+            },
+
             listeners: {
                 select: function(pk){
                     pk.syncSelectionText();
                 },
                 deselect: function(pk,value,values){
                     pk.syncSelectionText();
-                    console.log('deselect',values);
                     if (!values || values.length === 0){
                         pk.setValueText("");
                     }
@@ -202,35 +207,14 @@ Ext.define("feature-status-by-task", {
             itemId: 'usrTaskOwner',
             fieldLabel: 'Task Owner',
             labelAlign: 'right',
+            allowNoEntry: true,
             stateful: true,
             value: null,
-            remoteFilter: false,
-            stateId: this.getContext().getScopedStateId('fts-task-owner'),
+            stateId: 'fts-task-owner',
             displayField: "DisplayName",
             valueField: "ObjectID",
             labelWidth: this.labelWidth[idx],
-            width: this.controlWidth[idx++],
-            storeConfig: {
-                fetch: ['ObjectID','UserName','Email','First Name','Last Name','DisplayName']
-            },
-            listeners: {
-                beforestaterestore: function(cb,state){
-                    console.log('beforestaterestore',cb,state);
-                    cb.setValue(state.value);
-                },
-                staterestore: function(cb,state){
-                    console.log('staterestore',cb,state.value,cb.getValue(), cb.getRecord() && cb.getRecord().get(cb.displayField));
-                    if (cb.getValue() !== state.value || cb.getText() !== cb.getRecord() && cb.getRecord().get(cb.displayField)){
-                        cb.setValue(state.value);
-                    }
-                },
-                statesave: function(cb,state){
-                    console.log('statesave',cb,state);
-                },
-                beforestatesave: function(cb,state){
-                    console.log('beforestatesave',cb,state);
-                }
-            }
+            width: this.controlWidth[idx++]
 
         });
 
@@ -241,15 +225,13 @@ Ext.define("feature-status-by-task", {
             itemId: 'usrManager',
             labelAlign: 'right',
             stateful: true,
+            allowNoEntry: true,
             stateId: this.getContext().getScopedStateId('fts-manager'),
             displayField: "DisplayName",
             valueField: "ObjectID",
+            value: null,
             labelWidth: this.labelWidth[idx],
-            width: this.controlWidth[idx++],
-            remoteFilter: false,
-            storeConfig: {
-
-            }
+            width: this.controlWidth[idx++]
         });
 
         ct.add({
@@ -257,6 +239,7 @@ Ext.define("feature-status-by-task", {
             margin: this.margin,
             fieldLabel: 'Feature Owner',
             itemId: 'usrFeatureOwner',
+            allowNoEntry: true,
             labelAlign: 'right',
             stateful: true,
             stateId: this.getContext().getScopedStateId('fts-feature-owner'),
@@ -265,8 +248,6 @@ Ext.define("feature-status-by-task", {
             labelWidth: this.labelWidth[idx],
             width: this.controlWidth[idx++]
         });
-
-
 
     },
     getExtendedModelName: function(){
@@ -382,7 +363,6 @@ Ext.define("feature-status-by-task", {
             });
             return;
         }
-
         this.buildSummaryBar(refinedRecords.length, totalToDo, totalEstimate, totalCount);
         this.buildTreeGrid(refinedRecords, maxToDo, maxEstimate, maxCount);
     },
@@ -570,7 +550,14 @@ Ext.define("feature-status-by-task", {
             fields: featureRecords[0].getFields()
         });
 
-        var hash = {};
+        var hash = {},
+            displayGroup = {};
+
+        var otherGroupBy = this.groupByFields[0];
+        if (groupBy === this.groupByFields[0]){
+            otherGroupBy = this.groupByFields[1];
+        }
+
         Ext.Array.each(featureRecords, function(f){
             var groupValue = f.get(groupBy) || "None";
             if (!hash[groupValue]) {
@@ -580,9 +567,17 @@ Ext.define("feature-status-by-task", {
             childData.children = [];
             childData.leaf = true;
             hash[groupValue].push(Ext.create(treeModel, childData));
+
+            if (!displayGroup[groupValue]){
+                displayGroup[groupValue] = [];
+            }
+            if (!Ext.Array.contains(displayGroup[groupValue],childData[otherGroupBy])){
+                displayGroup[groupValue].push(childData[otherGroupBy]);
+            }
+
         });
 
-        this.logger.log('buildTreeStore', hash);
+        this.logger.log('buildTreeStore', hash, displayGroup);
         var data = [];
         var maxToDo = 0,
             maxEstimate = 0,
@@ -605,9 +600,11 @@ Ext.define("feature-status-by-task", {
 
             var fields = {children: children, leaf: false};
             fields[groupBy] = key;
+            fields[otherGroupBy] = displayGroup[key];
             fields.__taskCount = taskCount;
             fields.__taskEstimate = taskEstimate;
             fields.__taskToDo = taskToDo;
+
             data.push(Ext.create(treeModel, fields));
         });
 
@@ -652,12 +649,6 @@ Ext.define("feature-status-by-task", {
                 var feature = record.get('Feature')
                 return this.tpl.apply({name: feature && feature.Owner && feature.Owner.DisplayName || "" });
             }
-            //renderer: function(v,m,r){
-            //    if (v){
-            //        return v.Owner.DisplayName;
-            //    }
-            //    return '';
-            //}
         },{
             xtype: 'templatecolumn',
             text: "Feature QE Owner",
@@ -787,6 +778,13 @@ Ext.define("feature-status-by-task", {
     getGroupByField: function(){
         return this.down('#cbGroupBy') && this.down('#cbGroupBy').getValue() || null;
     },
+    getOtherGroupByField: function(){
+
+        if (this.getGroupByField() === this.groupByFields[0]){
+            return this.groupByFields[1];
+        }
+        return this.groupByFields[0];
+    },
     getGroupByDisplayName: function(){
         var cb = this.down('#cbGroupBy');
         return cb && cb.getRecord() &&
@@ -848,9 +846,9 @@ Ext.define("feature-status-by-task", {
         return [];
     },
     getFeatureFetchList: function(){
-        var fetch =  ['ObjectID','FormattedID','Name'];
+        var fetch =  ['ObjectID','FormattedID','Name','Owner'];
         if (this.getGroupByField()){
-            fetch.push(this.getGroupByField());
+            fetch = fetch.concat(this.groupByFields);
         }
         return fetch;
     },
@@ -875,39 +873,7 @@ Ext.define("feature-status-by-task", {
         });
         return deferred;
     },
-    //buildGrid: function(store){
-    //
-    //    store.on('load', this.fetchCalculatedData, this);
-    //
-    //    this.getGridBox().add({
-    //        xtype: 'rallygridboard',
-    //        context: this.getContext(),
-    //        modelNames: this.getModelNames(),
-    //        toggleState: 'grid',
-    //        stateful: false,
-    //        stateId: 'grid1',
-    //        plugins: [
-    //            this.getFilterPlugin(),
-    //            this.getFieldPickerPlugin()
-    //        ],
-    //        gridConfig: {
-    //            store: store,
-    //            stateId: 'treegrid1',
-    //            stateful: true,
-    //            enableRanking: false,
-    //            enableBulkEdit: false,
-    //            enableEditing: false,
-    //            folderSort: false,
-    //            shouldShowRowActionsColumn: false,
-    //            columnCfgs: this.getColumnCfgs(),
-    //            derivedColumns: this.getCalculatedColumns()
-    //        },
-    //        height: this.getHeight(),
-    //        width: '100%',
-    //        flex: 1
-    //    });
-    //
-    //},
+
     getStoryDetailFilters: function(){
         var filters = this.getStoryFilters();
 
@@ -999,21 +965,7 @@ Ext.define("feature-status-by-task", {
         }
         return null;
     },
-    //fetchCalculatedData: function(store, node, featureRecords, success){
-    //    this.logger.log('fetchCalculatedData', featureRecords);
-    //    var storyFilters = this.getStoryFilters(),
-    //        taskOwners = this.getTaskOwners();
-    //    //task remaining (weeks)
-    //    //task estimate weeks by state
-    //    //% task estimate
-    //    //# tasks
-    //    //% # tasks
-    //    Ext.create('CArABU.technicalservices.FeatureTaskStore').load(featureRecords, storyFilters, taskOwners).then({
-    //        success: this.updateSummary,
-    //        failure: this.showError,
-    //        scope: this
-    //    });
-    //},
+
     showError: function(msg){
         this.logger.log('showError', msg);
         Rally.ui.notify.Notifier.showError({message: msg});
@@ -1022,7 +974,8 @@ Ext.define("feature-status-by-task", {
 
         var columns = [];
 
-        var groupBy = this.getGroupByField();
+        var groupBy = this.getGroupByField(),
+            otherGroupBy = this.getOtherGroupByField();
         var totalWidth = 450,
             treeColumnWidth = 0,
             idAndNameSortable = true ;
@@ -1039,8 +992,20 @@ Ext.define("feature-status-by-task", {
                 width: treeColumnWidth,
                 renderer: function(v,m,r){
                     //We don't want to show this field if this is a leaf node.
-                    if (!r.get('FormattedID')){
-                        return v;
+                    if (!r.get('FormattedID')) {
+                        var val = r.get(groupBy),
+                            otherVals = r.get(otherGroupBy) || [];
+
+                        var x = val;
+                        if (!Ext.isArray(otherVals)){
+                            x = Ext.String.format("{0} - {1}", val, otherVals);
+                        } else if(otherVals.length === 1) {
+                           x = Ext.String.format("{0} - {1}", val, otherVals[0]);
+                        } else {
+                           x = Ext.String.format("{0} - {1}", val, otherVals.join(','));
+                        }
+
+                        return x;
                     }
                     return '';
                 }
@@ -1072,6 +1037,12 @@ Ext.define("feature-status-by-task", {
             renderer: function (val, metadata, record) {
                 metadata.style = 'cursor: pointer;';
                 return val;
+            }
+        },{
+            dataIndex: 'Owner',
+            text: 'Owner',
+            renderer: function(v,m,r){
+                return v && v._refObjectName;
             }
         },{
             xtype: 'tasktodocolumn',
