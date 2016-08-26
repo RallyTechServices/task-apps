@@ -3,10 +3,10 @@
 <head>
     <title>Task Burnup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Mon Aug 22 2016 12:57:14 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Aug 25 2016 20:51:44 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Aug 22 2016 12:57:14 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Aug 25 2016 20:51:44 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -41,6 +41,11 @@
     margin-right: 5px;
     cursor: pointer;
 }
+
+/*.color {*/
+/*// color: #E57E3A', '#3a874f', '#B2E3B6', '#3A874F'],*/
+
+/*}*/
     </style>
 
 </head>

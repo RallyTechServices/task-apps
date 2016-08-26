@@ -6,6 +6,7 @@ Ext.define("task-burnup", {
 
     items: [
         {xtype:'container',itemId:'selector_box', layout: 'hbox'},
+        {xtype:'container',itemId:'filter_box', layout: 'hbox'},
         {xtype: 'container', itemId: 'chart_header_box', layout: 'hbox'},
         {xtype:'container',itemId:'display_box'}
     ],
@@ -13,15 +14,39 @@ Ext.define("task-burnup", {
     integrationHeaders : {
         name : "task-burnup"
     },
-
-    portfolioFeatureTypePath: 'PortfolioItem/Feature',
-    margin: 10,
+    config: {
+        defaultSettings: {
+            portfolioItemType: "PortfolioItem/Feature",
+            employeeIDField: 'c_EmployeeId',
+            managerEmployeeIDField: 'c_ManagerEmployeeId'
+        }
+    },
+    margin: 5,
     showCFD: false,
+
+    cfdToolTipText: "<p>Task Cumulative Flow</p><p>The task cumulative flow chart shows the flow of Task states over time.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state (in weeks).</p><p>In-Progress and Defined represent the sum of the To Do for the tasks in those states.</p>",
+
+    burnupToolTipText: "<p>Task Burnup</p><p>The task burnup chart shows the sum of the completed, remaining and estimated tasks (in weeks) over time for the selected criteria.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state.</p><p>Estimated is the sum of the Task Estimates.  Remaining is the sum of the Task To Do (if the task is not in the Completed state).</p>",
                         
     launch: function() {
-        this.initializeApp();
+        this.setLoading('Initializing Users...');
+        CArABU.technicalservices.Utility.fetchManagerTree(this.getManagerIDField(), this.getEmployeeIDField()).then({
+            success: function(){
+                this.initializeApp();
+            },
+            failure: this.showErrorNotification,
+            scope: this
+        }).always(function(){ this.setLoading(false); },this);
     },
-
+    getPortfolioItemType: function(){
+        return this.getSetting('portfolioItemType');
+    },
+    getManagerIDField: function(){
+        return this.getSetting('managerEmployeeIDField');
+    },
+    getEmployeeIDField: function(){
+        return this.getSetting('employeeIDField');
+    },
     initializeApp: function(){
         this.logger.log('initializeApp');
         this.addComponents();
@@ -39,10 +64,35 @@ Ext.define("task-burnup", {
         this.logger.log('addComponents');
 
         this.getSelectorBox().add({
-            fieldLabel: 'Feature Milestone',
+                fieldLabel: 'Feature Milestone',
+                xtype: 'rallymilestonepicker',
+                itemId: 'featureMilestone',
+                labelAlign: 'right',
+                labelWidth: 100,
+                width: 300,
+                margin: this.margin,
+                listeners: {
+                    select: function(pk){
+                        pk.syncSelectionText();
+                    },
+                    deselect: function(pk,value,values){
+                        pk.syncSelectionText();
+                        if (!values || values.length === 0){
+                            pk.setValueText("");
+                        }
+
+                    }
+                }
+        });
+
+        this.getSelectorBox().add({
+            fieldLabel: 'Story Milestone',
             xtype: 'rallymilestonepicker',
+            itemId: 'storyMilestone',
             labelAlign: 'right',
             margin: this.margin,
+            labelWidth: 100,
+            width: 300,
             listeners: {
                 select: function(pk){
                     pk.syncSelectionText();
@@ -56,13 +106,36 @@ Ext.define("task-burnup", {
                 }
             }
         });
+        var filterBox = this.down('#filter_box').add({
+            xtype: 'standalonefilter',
+            context: this.getContext(),
+            flex: 1
+        });
 
-        var bt = this.getSelectorBox().add({
+        filterBox.getLeft().add({
+            xtype: 'rallyusercombobox',
+            margin: this.margin,
+            fieldLabel: 'Manager',
+            itemId: 'usrManager',
+            labelAlign: 'right',
+            labelWidth: 100,
+            width: 300,
+            stateful: true,
+            allowNoEntry: true,
+            stateId: this.getContext().getScopedStateId('userManager'),
+            displayField: "DisplayName",
+            valueField: "ObjectID",
+            value: null
+        });
+
+        var bt = filterBox.getRight().add({
             xtype: 'rallybutton',
             text: 'Update',
-            margin: this.margin
+            margin: '5 50 5 50',
+            width: 100
         });
-        bt.on('click', this.getFeatures, this);
+
+        bt.on('click', this.getAncestors, this);
 
         this.getChartHeader().add({
             xtype: 'container',
@@ -78,6 +151,7 @@ Ext.define("task-burnup", {
             enableToggle: true,
             pressed: true,
             scope: this,
+            toolTipText: this.burnupToolTipText,
             listeners: {
                 toggle: this.toggleDetail,
                 scope: this
@@ -93,6 +167,7 @@ Ext.define("task-burnup", {
             enableToggle: true,
             scope: this,
             pressed: false,
+           toolTipText: this.cfdToolTipText,
            listeners: {
                 toggle: this.toggleDetail,
                 scope: this
@@ -110,7 +185,7 @@ Ext.define("task-burnup", {
             btn.addCls('secondary');
         }
 
-        this.getFeatures();
+        this.getAncestors();
 
     },
     getShowCFD: function(){
@@ -119,22 +194,117 @@ Ext.define("task-burnup", {
     getShowBurnup: function(){
         return this.down('#btn-burnup').pressed;
     },
-    getMilestoneRefs: function(){
-        return this.down('rallymilestonepicker').getValue();
+    getFeatureMilestones: function(){
+        return this.down('#featureMilestone').getValue() || [];
     },
-    getFeatures: function(){
+    getStoryMilestones: function(){
+        return this.down('#storyMilestone').getValue() || [];
+    },
+    getFeatureFilters: function() {
+        return this.down('standalonefilter').getCustomFilter();
+    },
+    getStoryFiltersFromFeatureFilters: function(featureFilters){
+        if (!featureFilters){
+            return [];
+        }
 
-        var milestones = this.getMilestoneRefs(),
-            filters = Ext.Array.map(milestones, function(m){
+        var filterString = featureFilters.toString(),
+            featureName = this.getFeatureName();
+
+        var filters = filterString.match(/\([^()]+\)/g);
+        Ext.Array.each(filters, function(segment){
+            var newSegment= segment.replace("(","(" + featureName + ".");
+            filterString = filterString.replace(segment, newSegment);
+        });
+        this.logger.log('getStoryFiltersFromFeatureFilters', filterString);
+        return Rally.data.wsapi.Filter.fromQueryString(filterString);
+    },
+    getFeatureName: function(){
+        return this.getPortfolioItemType().replace('PortfolioItem/','');
+    },
+    getTaskOwners: function(){
+        var manager = this.down('#usrManager') && this.down('#usrManager').getRecord();
+
+        this.logger.log('getTaskOwners', manager);
+        var users = [];
+        if (manager){
+            this.logger.log('getTaskOwners including manager reports', manager);
+            var reports = CArABU.technicalservices.Utility.getReports(manager);
+            users = users.concat(reports);
+        }
+        if (users.length > 0){
+            return users;
+        }
+        return null;
+    },
+    getAncestors: function(){
+
+        var featureMilestones = this.getFeatureMilestones(),
+            storyMilestones = this.getStoryMilestones(),
+            featureFilters = this.getFeatureFilters(),
+            featureName = this.getFeatureName();
+
+        this.logger.log('getAncestors', featureMilestones, storyMilestones, featureFilters);
+        if (featureMilestones.length === 0 && storyMilestones.length === 0 && !featureFilters){
+            Rally.ui.notify.Notifier.showWarning({message:  "Please select a Feature Milestone, filter or Story Milestone filter."});
+            return;
+        }
+
+
+        var model = this.getPortfolioItemType(),
+            filters = [];
+
+        if (storyMilestones.length > 0){
+            var storyFilters = Ext.Array.map(storyMilestones, function(m){
+                return {
+                    property: 'Milestones',
+                    value: m.get('_ref')
+                };
+            });
+            storyFilters = Rally.data.wsapi.Filter.or(storyFilters);
+
+            if (featureMilestones.length > 0){
+                var featureParentFilters = Ext.Array.map(featureMilestones, function(m){
+                    return {
+                        property: featureName + '.Milestones',
+                        value: m.get('_ref')
+                    };
+                });
+                featureParentFilters = Rally.data.wsapi.Filter.or(featureParentFilters);
+                storyFilters = storyFilters.and(featureParentFilters);
+            }
+
+            if (featureFilters){
+                this.logger.log('featureFilters', featureFilters, featureFilters.toString());
+                storyFilters = storyFilters.and(this.getStoryFiltersFromFeatureFilters(featureFilters));
+            }
+
+
+
+            this.logger.log('getAncestors',storyFilters.toString());
+
+            model = 'HierarchicalRequirement';
+            filters = storyFilters;
+
+        } else if (featureMilestones.length > 0){
+            filters = Ext.Array.map(featureMilestones, function(m){
                 return {
                     property: 'Milestones',
                     value: m.get('_ref')
                 };
             });
             filters = Rally.data.wsapi.Filter.or(filters);
-        this.logger.log('getFeatures',milestones, filters);
+
+            if (featureFilters){
+                filters = filters.and(featureFilters);
+            }
+
+        } else if (featureFilters){
+            filters = featureFilters;
+        }
+
         Ext.create('Rally.data.wsapi.Store',{
-            model: this.portfolioFeatureTypePath,
+            model: model,
             fetch: ['ObjectID'],
             filters: filters,
             limit: 'Infinity'
@@ -154,20 +324,25 @@ Ext.define("task-burnup", {
     showErrorNotification: function(msg){
         Rally.ui.notify.Notifier.showError({message: msg});
     },
-    updateView: function(features){
+    updateView: function(ancestors){
 
-        var featureOids = Ext.Array.map(features, function(f){ return f.get('ObjectID');});
-        this.logger.log('updateView', featureOids);
+        var oids = Ext.Array.map(ancestors, function(f){ return f.get('ObjectID');});
+        this.logger.log('updateView', oids);
+
+        var taskOwners = this.getTaskOwners();
 
         this.getDisplayBox().removeAll();
 
         if (this.getShowBurnup()){
             this.getDisplayBox().add({
                 xtype: 'rallychart',
+                chartColors:  ['#6ab17d', '#E5D038', '#E57E3A'],  //Estimate, completed, Remaining
                 storeType: 'Rally.data.lookback.SnapshotStore',
-                storeConfig: this.getStoreConfig(featureOids),
+                storeConfig: this.getStoreConfig(oids),
                 calculatorType: 'CArABU.technicalservices.TaskBurnupCalculator',
-                calculatorConfig: {},
+                calculatorConfig: {
+                    taskOwners: taskOwners
+                },
                 chartConfig: this.getChartConfig()
             });
         }
@@ -175,16 +350,18 @@ Ext.define("task-burnup", {
         if (this.getShowCFD()) {
             this.getDisplayBox().add({
                 xtype: 'rallychart',
+                chartColors:  ['#E57E3A', '#E5D038', '#6ab17d'],
                 storeType: 'Rally.data.lookback.SnapshotStore',
-                storeConfig: this.getStoreConfig(featureOids),
+                storeConfig: this.getStoreConfig(oids),
                 calculatorType: 'CArABU.technicalservices.TaskCFDCalculator',
-                calculatorConfig: {},
+                calculatorConfig: {
+                    taskOwners: taskOwners
+                },
                 chartConfig: this.getCFDConfig() //this.getChartConfig()
             });
+
+
         }
-
-
-
     },
 
     getStoreConfig: function(featureOids) {
@@ -198,7 +375,7 @@ Ext.define("task-burnup", {
                     _ItemHierarchy: {$in: chunk},
                     _TypeHierarchy: 'Task'
                 },
-                fetch: ['State', 'ToDo','Estimate'],
+                fetch: ['State', 'ToDo','Estimate','Owner'],
                 hydrate: ['State'],
                 sort: {
                     _ValidFrom: 1
@@ -240,6 +417,11 @@ Ext.define("task-burnup", {
                 area: {
                     stacking: 'normal'
                 }
+            },
+            tooltip: {
+                formatter: function() {
+                    return '' + this.x + '<br />' + this.series.name + ': ' + Math.round(this.y);
+                }
             }
         };
     },
@@ -270,7 +452,7 @@ Ext.define("task-burnup", {
             ],
             tooltip: {
                 formatter: function() {
-                    return '' + this.x + '<br />' + this.series.name + ': ' + this.y;
+                    return '' + this.x + '<br />' + this.series.name + ': ' + Math.round(this.y);
                 }
             },
             plotOptions: {
