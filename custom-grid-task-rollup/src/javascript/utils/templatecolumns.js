@@ -19,6 +19,22 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
      *      function(){ return false; }
      */
     showDangerNotificationFn: function(values) {
+        var taskObjectIDs = this.taskCache && this.taskCache.getTaskList(values.ObjectID);
+
+        if (Ext.isArray(taskObjectIDs)){
+            var invalid = false;
+            Ext.Array.each(taskObjectIDs, function(t){
+                var task = this.taskCache.getTask(t);
+                if (task){
+                    invalid = !task.Estimate;
+                    if (invalid){
+                        return false;
+                    }
+                }
+            }, this);
+            return invalid;
+
+        }
         return false;
     },
 
@@ -64,11 +80,9 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
                 completed = 0,
                 total = 0,
                 taskObjectIDs = this.taskCache && this.taskCache.getTaskList(recordData.ObjectID);
-            console.log('calculatePercent', taskObjectIDs, recordData);
             if (Ext.isArray(taskObjectIDs)){
                 Ext.Array.each(taskObjectIDs, function(t){
                     var task = this.taskCache.getTask(t);
-                    console.log('tasks', task);
                     var isCompleted = task.State === "Completed",
                         estimate = task.Estimate || 0,
                         todo = task.ToDo || 0;
@@ -94,12 +108,13 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
                         completed = recordData.Estimate || 0;
                     } else {
                         completed = recordData.Estimate - recordData.ToDo || 0;
+
                     }
                     total = recordData.Estimate || 0;
                 }
             }
             if (total > 0){
-                console.log('calculatePercent', completed, total, Math.round(completed/total));
+                completed = Math.max(completed, 0);
                 return Math.round(completed/total * 100);
             }
             return 0;
@@ -120,7 +135,7 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
         },
         getDangerTooltip: function(recordData){
             if (!recordData["Estimate"]){
-                return "No Estimate on Task.  Using ToDo if its present.";
+                return "No Estimate on one or more Tasks.";
             }
             return "";
         }
