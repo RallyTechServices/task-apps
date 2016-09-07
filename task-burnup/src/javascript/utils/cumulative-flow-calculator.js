@@ -8,6 +8,7 @@ Ext.define('CArABU.technicalservices.TaskCFDCalculator', {
 
     constructor: function(config) {
         this.initConfig(config);
+        this.taskOwners = config.taskOwners;
         this.callParent(arguments);
     },
 
@@ -36,11 +37,16 @@ Ext.define('CArABU.technicalservices.TaskCFDCalculator', {
 
     },
     getDerivedFieldsOnInput: function () {
-        var completedStateNames = this.getCompletedStates();
+        var completedStateNames = this.getCompletedStates(),
+            taskOwners = this.taskOwners;
         return [
             {
                 "as": "Remaining",
                 "f": function (snapshot) {
+                    if (taskOwners && !Ext.Array.contains(taskOwners,snapshot.Owner)){
+                        return 0;
+                    }
+
                     if (snapshot.ToDo){
                         return snapshot.ToDo/40;
                     } else {
@@ -52,6 +58,11 @@ Ext.define('CArABU.technicalservices.TaskCFDCalculator', {
             {
                 "as": "Completed",
                 "f": function (snapshot) {
+
+                    if (taskOwners && !Ext.Array.contains(taskOwners,snapshot.Owner)){
+                        return 0;
+                    }
+
                     if (_.contains(completedStateNames, snapshot.State) && snapshot.Estimate) {
                         return snapshot.Estimate/40;
                     }

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Task Burnup</title>
+    <title>Custom List Task Rollup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Aug 26 2016 12:29:24 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Sep 07 2016 16:45:48 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Aug 26 2016 12:29:24 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Sep 07 2016 16:45:48 GMT-0600 (MDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
@@ -16,8 +16,8 @@
         Rally.onReady(function() {
             
             
-               Rally.launchApp('task-burnup', {
-                   name: 'Task Burnup'
+               Rally.launchApp('custom-list-task-rollup', {
+                   name: 'Custom List Task Rollup'
                });
         });
     </script>
@@ -41,11 +41,6 @@
     margin-right: 5px;
     cursor: pointer;
 }
-
-/*.color {*/
-/*// color: #E57E3A', '#3a874f', '#B2E3B6', '#3A874F'],*/
-
-/*}*/
     </style>
 
 </head>
