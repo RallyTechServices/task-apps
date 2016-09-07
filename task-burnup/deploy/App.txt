@@ -3,12 +3,12 @@
 <head>
     <title>Task Burnup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Aug 25 2016 20:51:44 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Aug 26 2016 12:29:24 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Aug 25 2016 20:51:44 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Aug 26 2016 12:29:24 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 23920898075;
+        var CHECKSUM = 24130366026;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -682,9 +682,9 @@ Ext.define("task-burnup", {
     margin: 5,
     showCFD: false,
 
-    cfdToolTipText: "<p>Task Cumulative Flow</p><p>The task cumulative flow chart shows the flow of Task states over time.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state (in weeks).</p><p>In-Progress and Defined represent the sum of the To Do for the tasks in those states.</p>",
+    cfdToolTipText: "<p>Task Cumulative Flow</p><p>The task cumulative flow chart shows the flow of Task states over time.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state (in weeks).</p><p>In-Progress is the sum of the ToDo (or Estimate if there is no To Do) for the tasks In Progress.</p><p>Defined is the sum of the To Do (or Estimate if there is no To Do) for tasks in the Defined state.</p>",
 
-    burnupToolTipText: "<p>Task Burnup</p><p>The task burnup chart shows the sum of the completed, remaining and estimated tasks (in weeks) over time for the selected criteria.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state.</p><p>Estimated is the sum of the Task Estimates.  Remaining is the sum of the Task To Do (if the task is not in the Completed state).</p>",
+    burnupToolTipText: "<p>Task Burnup</p><p>The task burnup chart shows the sum of the completed, remaining and estimated tasks (in weeks) over time for the selected criteria.</p><p>Completed is the sum of the estimate of all tasks in the completed state in addition to the Estimate - ToDo for tasks in the In-Progress or Defined state.</p><p>Estimated is the sum of the Task Estimates.</p><p>Remaining is the sum of the Task To Do (if the task is not in the Completed state).</p>",
                         
     launch: function() {
         this.setLoading('Initializing Users...');
