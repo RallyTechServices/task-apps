@@ -174,12 +174,12 @@
             displayField: 'DisplayName',
             valueField: 'TypePath'
 
-        },{
-            name: 'useLookback',
-            xtype: 'rallycheckboxfield',
-            labelWidth: labelWidth,
-            fieldLabel: 'Use Lookback',
-            labelAlign: 'right'
+        //},{
+        //    name: 'useLookback',
+        //    xtype: 'rallycheckboxfield',
+        //    labelWidth: labelWidth,
+        //    fieldLabel: 'Use Lookback',
+        //    labelAlign: 'right'
         }];
     },
     

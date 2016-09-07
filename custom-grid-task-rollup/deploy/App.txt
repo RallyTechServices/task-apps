@@ -3,12 +3,12 @@
 <head>
     <title>Custom List Task Rollup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Wed Sep 07 2016 17:00:36 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Sep 07 2016 17:06:09 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Sep 07 2016 17:00:36 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Sep 07 2016 17:06:09 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 13850210400;
+        var CHECKSUM = 13860226260;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -784,12 +784,12 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             displayField: 'DisplayName',
             valueField: 'TypePath'
 
-        },{
-            name: 'useLookback',
-            xtype: 'rallycheckboxfield',
-            labelWidth: labelWidth,
-            fieldLabel: 'Use Lookback',
-            labelAlign: 'right'
+        //},{
+        //    name: 'useLookback',
+        //    xtype: 'rallycheckboxfield',
+        //    labelWidth: labelWidth,
+        //    fieldLabel: 'Use Lookback',
+        //    labelAlign: 'right'
         }];
     },
     
