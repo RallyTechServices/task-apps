@@ -11,7 +11,8 @@
         defaultSettings: {
             viewType: 'HierarchicalRequirement',
             useLookback: true,
-            maxChunkSize: 40
+            maxChunkSize: 40,
+            queryFilter: 'queryFilter'
         }
     },
                         
@@ -26,6 +27,7 @@
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: [this.getViewType()],
             fetch: this.getFetchList(),
+            filters: this.getFilters(),
             enableHierarchy: true
         }).then({
             success: this.buildGrid,
@@ -40,6 +42,12 @@
         }
         return fetch;
     },
+     getFilters: function(){
+         if (this.getSetting('queryFilter')){
+             return Rally.data.wsapi.Filter.fromQueryString(this.getSetting('queryFilter'));
+         }
+         return [];
+     },
     buildGrid: function(store){
         this.logger.log('buildGrid');
 
@@ -50,8 +58,6 @@
 
         store.model.addField({name: '__tasks', type: 'auto', defaultValue: null});
         store.on('load', this.updateTaskCache, this);
-
-     //   store.load();
 
         var context = this.getContext(),
             modelNames = [this.getViewType()],
@@ -70,6 +76,7 @@
             modelNames: modelNames,
             toggleState: 'grid',
             stateful: false,
+
             plugins: [{
                     ptype: 'rallygridboardfieldpicker',
                     headerPosition: 'left',
@@ -97,17 +104,29 @@
                     }
                 },{
                 ptype: 'rallygridboardsharedviewcontrol',
+                stateful: true,
+                stateId: context.getScopedStateId('task-view'),
+                stateEvents: ['select','beforedestroy'],
                 margin: margin
             }],
             gridConfig: {
                 rankColumnDataIndex: rankField,
                 enableRanking: enableRank,
                 store: store,
+                storeConfig: {
+                    filters: this.getFilters()
+                },
                 columnCfgs: [
                     'FormattedID',
                     'Name'
                 ].concat(this.getDerivedColumns()),
                 derivedColumns: this.getDerivedColumns()
+            },
+            listeners: {
+                viewchange: function(gb){
+                    this.buildStore();
+                },
+                scope: this
             },
             height: this.getHeight()
         });
@@ -188,6 +207,34 @@
             },
             displayField: 'DisplayName',
             valueField: 'TypePath'
+        },{
+            xtype: 'textarea',
+            fieldLabel: 'Query Filter',
+            name: 'queryFilter',
+            anchor: '100%',
+            cls: 'query-field',
+            margin: '0 70 0 0',
+            labelAlign: 'right',
+            labelWidth: 100,
+            plugins: [
+                {
+                    ptype: 'rallyhelpfield',
+                    helpId: 194
+                },
+                'rallyfieldvalidationui'
+            ],
+            validateOnBlur: false,
+            validateOnChange: false,
+            validator: function(value) {
+                try {
+                    if (value) {
+                        Rally.data.wsapi.Filter.fromQueryString(value);
+                    }
+                    return true;
+                } catch (e) {
+                    return e.message;
+                }
+            }
         }];
     },
     
