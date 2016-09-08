@@ -3,12 +3,12 @@
 <head>
     <title>Custom List Task Rollup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Wed Sep 07 2016 17:06:09 GMT-0600 (MDT) -->
+    <!--  Build Date: Wed Sep 07 2016 18:23:39 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Sep 07 2016 17:06:09 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Wed Sep 07 2016 18:23:39 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 13860226260;
+        var CHECKSUM = 14448774589;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -305,6 +305,7 @@ Ext.define('CArABU.technicalservices.TaskCache',{
         } else {
             if (missingRecords[0].get('_type') === 'task'){
                 for (var i=0; i<missingRecords.length; i++){
+                    this.taskMap[missingRecords[i].get('ObjectID')] = [missingRecords[i].get('ObjectID')];
                     this.tasks[missingRecords[i].get('ObjectID')] = missingRecords[i].getData();
                 }
                 deferred.resolve(records);
@@ -635,13 +636,20 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
         this.logger.log('buildStore', this.getViewType());
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: [this.getViewType()],
-            fetch: ['ObjectID'],
+            fetch: this.getFetchList(),
             enableHierarchy: true
         }).then({
             success: this.buildGrid,
             failure: this.showErrorMessage,
             scope: this
         });
+    },
+    getFetchList: function(){
+        var fetch = ['ObjectID'];
+        if (this.getViewType().toLowerCase() === 'task'){
+            return fetch.concat(['Estimate','ToDo','State']);
+        }
+        return fetch;
     },
     buildGrid: function(store){
         this.logger.log('buildGrid');
@@ -658,7 +666,14 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
 
         var context = this.getContext(),
             modelNames = [this.getViewType()],
-            margin = '3 10 3 10';
+            margin = '3 10 3 10',
+            rankField = 'DragAndDropRank',
+            enableRank = true;
+
+        if (this.getViewType().toLowerCase() === 'task'){
+            rankField = 'TaskIndex';
+            enableRank = false;
+        }
 
         this.add({
             xtype: 'rallygridboard',
@@ -667,9 +682,6 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             toggleState: 'grid',
             stateful: false,
             plugins: [{
-                    ptype: 'rallygridboardaddnew',
-                    margin: margin
-            },{
                     ptype: 'rallygridboardfieldpicker',
                     headerPosition: 'left',
                     modelNames: modelNames,
@@ -694,13 +706,18 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
                             }
                         }
                     }
-                }
-            ],
+                },{
+                ptype: 'rallygridboardsharedviewcontrol',
+                margin: margin
+            }],
             gridConfig: {
+                rankColumnDataIndex: rankField,
+                enableRanking: enableRank,
                 store: store,
                 columnCfgs: [
+                    'FormattedID',
                     'Name'
-                ],
+                ].concat(this.getDerivedColumns()),
                 derivedColumns: this.getDerivedColumns()
             },
             height: this.getHeight()
@@ -727,7 +744,6 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
     updateModels: function(records){
         this.logger.log('updateModels', this.taskCache);
         Ext.Array.each(records, function(r){
-
             r.set('__tasks', this.taskCache && this.taskCache.getTaskList(r.get('ObjectID')));
             console.log('r', r.get('__tasks'))
         }, this );
@@ -783,13 +799,6 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             },
             displayField: 'DisplayName',
             valueField: 'TypePath'
-
-        //},{
-        //    name: 'useLookback',
-        //    xtype: 'rallycheckboxfield',
-        //    labelWidth: labelWidth,
-        //    fieldLabel: 'Use Lookback',
-        //    labelAlign: 'right'
         }];
     },
     

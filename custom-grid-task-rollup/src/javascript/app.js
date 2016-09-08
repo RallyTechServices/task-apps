@@ -25,13 +25,20 @@
         this.logger.log('buildStore', this.getViewType());
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: [this.getViewType()],
-            fetch: ['ObjectID'],
+            fetch: this.getFetchList(),
             enableHierarchy: true
         }).then({
             success: this.buildGrid,
             failure: this.showErrorMessage,
             scope: this
         });
+    },
+    getFetchList: function(){
+        var fetch = ['ObjectID'];
+        if (this.getViewType().toLowerCase() === 'task'){
+            return fetch.concat(['Estimate','ToDo','State']);
+        }
+        return fetch;
     },
     buildGrid: function(store){
         this.logger.log('buildGrid');
@@ -48,7 +55,14 @@
 
         var context = this.getContext(),
             modelNames = [this.getViewType()],
-            margin = '3 10 3 10';
+            margin = '3 10 3 10',
+            rankField = 'DragAndDropRank',
+            enableRank = true;
+
+        if (this.getViewType().toLowerCase() === 'task'){
+            rankField = 'TaskIndex';
+            enableRank = false;
+        }
 
         this.add({
             xtype: 'rallygridboard',
@@ -57,9 +71,6 @@
             toggleState: 'grid',
             stateful: false,
             plugins: [{
-                    ptype: 'rallygridboardaddnew',
-                    margin: margin
-            },{
                     ptype: 'rallygridboardfieldpicker',
                     headerPosition: 'left',
                     modelNames: modelNames,
@@ -84,13 +95,18 @@
                             }
                         }
                     }
-                }
-            ],
+                },{
+                ptype: 'rallygridboardsharedviewcontrol',
+                margin: margin
+            }],
             gridConfig: {
+                rankColumnDataIndex: rankField,
+                enableRanking: enableRank,
                 store: store,
                 columnCfgs: [
+                    'FormattedID',
                     'Name'
-                ],
+                ].concat(this.getDerivedColumns()),
                 derivedColumns: this.getDerivedColumns()
             },
             height: this.getHeight()
@@ -117,7 +133,6 @@
     updateModels: function(records){
         this.logger.log('updateModels', this.taskCache);
         Ext.Array.each(records, function(r){
-
             r.set('__tasks', this.taskCache && this.taskCache.getTaskList(r.get('ObjectID')));
             console.log('r', r.get('__tasks'))
         }, this );
@@ -173,13 +188,6 @@
             },
             displayField: 'DisplayName',
             valueField: 'TypePath'
-
-        //},{
-        //    name: 'useLookback',
-        //    xtype: 'rallycheckboxfield',
-        //    labelWidth: labelWidth,
-        //    fieldLabel: 'Use Lookback',
-        //    labelAlign: 'right'
         }];
     },
     
