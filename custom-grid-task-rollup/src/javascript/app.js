@@ -12,7 +12,7 @@
             viewType: 'HierarchicalRequirement',
             useLookback: true,
             maxChunkSize: 40,
-            queryFilter: 'queryFilter'
+            queryFilter: ''
         }
     },
                         

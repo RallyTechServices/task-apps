@@ -3,12 +3,12 @@
 <head>
     <title>Custom List Task Rollup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Sep 08 2016 14:40:54 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Sep 08 2016 14:42:29 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Sep 08 2016 14:40:54 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Sep 08 2016 14:42:29 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 17609718083;
+        var CHECKSUM = 17587957122;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -652,7 +652,7 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             viewType: 'HierarchicalRequirement',
             useLookback: true,
             maxChunkSize: 40,
-            queryFilter: 'queryFilter'
+            queryFilter: ''
         }
     },
                         
