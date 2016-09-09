@@ -769,6 +769,13 @@ Ext.define("manager-task-report", {
                 menuDisabled: true,
                 dataIndex:'numCompleted'
             },{
+                text: 'Total Estimate (Wks)',
+                menuDisabled: true,
+                dataIndex: 'totalEffort',
+                renderer: function(v){
+                    return Number(v/40).toFixed(1);
+                }
+            },{
                 text: 'Total ToDo (Wks)',
                 menuDisabled: true,
                 dataIndex: 'ToDo',

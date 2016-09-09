@@ -3,12 +3,12 @@
 <head>
     <title>Custom List Task Rollup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Wed Sep 07 2016 17:06:09 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Sep 09 2016 12:42:23 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Sep 07 2016 17:06:09 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Sep 09 2016 12:42:23 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 13860226260;
+        var CHECKSUM = 17646538043;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -258,6 +258,35 @@ Ext.override(Rally.ui.grid.TreeGrid, {
 
     }
 });
+
+Ext.override(Rally.ui.gridboard.plugin.GridBoardInlineFilterControl,{
+    setCurrentView: function(view) {
+        var inlineFilterButton = this.getControlCmp().getComponent('inlineFilterButton'),
+            stateId = inlineFilterButton.getStateId(),
+            state = _.pick(view, this.sharedViewState);
+        console.log('setCurrentview filter', inlineFilterButton, stateId, state);
+        Ext.apply(state, _.pick(inlineFilterButton.getState(), 'collapsed', 'advancedCollapsed'));
+        Ext.state.Manager.set(stateId, state);
+    }
+});
+
+Ext.override(Rally.ui.gridboard.GridBoard, {
+    setCurrentView: function(view) {
+
+        this._setSharedViewProperties(this.plugins, view);
+        console.log ('setCurrentView', view);
+        if (view.toggleState === 'grid') {
+            Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
+        } else if (view.toggleState === 'board') {
+            Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
+        }
+        console.log ('setCurrentView2', view);
+        Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
+        console.log ('setCurrentView3', view);
+        this.fireEvent('viewchange', this);
+        console.log ('setCurrentView4', view);
+    }
+});
 /**
  * Created by kcorkan on 9/6/16.
  */
@@ -305,6 +334,7 @@ Ext.define('CArABU.technicalservices.TaskCache',{
         } else {
             if (missingRecords[0].get('_type') === 'task'){
                 for (var i=0; i<missingRecords.length; i++){
+                    this.taskMap[missingRecords[i].get('ObjectID')] = [missingRecords[i].get('ObjectID')];
                     this.tasks[missingRecords[i].get('ObjectID')] = missingRecords[i].getData();
                 }
                 deferred.resolve(records);
@@ -621,7 +651,8 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
         defaultSettings: {
             viewType: 'HierarchicalRequirement',
             useLookback: true,
-            maxChunkSize: 40
+            maxChunkSize: 40,
+            queryFilter: ''
         }
     },
                         
@@ -635,7 +666,8 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
         this.logger.log('buildStore', this.getViewType());
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: [this.getViewType()],
-            fetch: ['ObjectID'],
+            fetch: this.getFetchList(),
+            filters: this.getFilters(),
             enableHierarchy: true
         }).then({
             success: this.buildGrid,
@@ -643,6 +675,19 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             scope: this
         });
     },
+    getFetchList: function(){
+        var fetch = ['ObjectID'];
+        if (this.getViewType().toLowerCase() === 'task'){
+            return fetch.concat(['Estimate','ToDo','State']);
+        }
+        return fetch;
+    },
+     getFilters: function(){
+         if (this.getSetting('queryFilter')){
+             return Rally.data.wsapi.Filter.fromQueryString(this.getSetting('queryFilter'));
+         }
+         return [];
+     },
     buildGrid: function(store){
         this.logger.log('buildGrid');
 
@@ -654,11 +699,16 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
         store.model.addField({name: '__tasks', type: 'auto', defaultValue: null});
         store.on('load', this.updateTaskCache, this);
 
-     //   store.load();
-
         var context = this.getContext(),
             modelNames = [this.getViewType()],
-            margin = '3 10 3 10';
+            margin = '3 10 3 10',
+            rankField = 'DragAndDropRank',
+            enableRank = true;
+
+        if (this.getViewType().toLowerCase() === 'task'){
+            rankField = 'TaskIndex';
+            enableRank = false;
+        }
 
         this.add({
             xtype: 'rallygridboard',
@@ -666,9 +716,9 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             modelNames: modelNames,
             toggleState: 'grid',
             stateful: false,
+
             plugins: [{
-                    ptype: 'rallygridboardaddnew',
-                    margin: margin
+                ptype: 'rallygridboardaddnew'
             },{
                     ptype: 'rallygridboardfieldpicker',
                     headerPosition: 'left',
@@ -694,14 +744,31 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
                             }
                         }
                     }
-                }
-            ],
+                },{
+                ptype: 'rallygridboardsharedviewcontrol',
+                stateful: true,
+                stateId: context.getScopedStateId('task-view'),
+                stateEvents: ['select','beforedestroy'],
+                margin: margin
+            }],
             gridConfig: {
+                rankColumnDataIndex: rankField,
+                enableRanking: enableRank,
                 store: store,
+                storeConfig: {
+                    filters: this.getFilters()
+                },
                 columnCfgs: [
+                    'FormattedID',
                     'Name'
-                ],
+                ].concat(this.getDerivedColumns()),
                 derivedColumns: this.getDerivedColumns()
+            },
+            listeners: {
+                viewchange: function(gb){
+                    this.buildStore();
+                },
+                scope: this
             },
             height: this.getHeight()
         });
@@ -727,7 +794,6 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
     updateModels: function(records){
         this.logger.log('updateModels', this.taskCache);
         Ext.Array.each(records, function(r){
-
             r.set('__tasks', this.taskCache && this.taskCache.getTaskList(r.get('ObjectID')));
             console.log('r', r.get('__tasks'))
         }, this );
@@ -783,13 +849,34 @@ Ext.define('CArABU.technicalservices.TaskPctComplete', {
             },
             displayField: 'DisplayName',
             valueField: 'TypePath'
-
-        //},{
-        //    name: 'useLookback',
-        //    xtype: 'rallycheckboxfield',
-        //    labelWidth: labelWidth,
-        //    fieldLabel: 'Use Lookback',
-        //    labelAlign: 'right'
+        },{
+            xtype: 'textarea',
+            fieldLabel: 'Query Filter',
+            name: 'queryFilter',
+            anchor: '100%',
+            cls: 'query-field',
+            margin: '0 70 0 0',
+            labelAlign: 'right',
+            labelWidth: 100,
+            plugins: [
+                {
+                    ptype: 'rallyhelpfield',
+                    helpId: 194
+                },
+                'rallyfieldvalidationui'
+            ],
+            validateOnBlur: false,
+            validateOnChange: false,
+            validator: function(value) {
+                try {
+                    if (value) {
+                        Rally.data.wsapi.Filter.fromQueryString(value);
+                    }
+                    return true;
+                } catch (e) {
+                    return e.message;
+                }
+            }
         }];
     },
     

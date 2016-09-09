@@ -45,6 +45,7 @@ Ext.define('CArABU.technicalservices.TaskCache',{
         } else {
             if (missingRecords[0].get('_type') === 'task'){
                 for (var i=0; i<missingRecords.length; i++){
+                    this.taskMap[missingRecords[i].get('ObjectID')] = [missingRecords[i].get('ObjectID')];
                     this.tasks[missingRecords[i].get('ObjectID')] = missingRecords[i].getData();
                 }
                 deferred.resolve(records);

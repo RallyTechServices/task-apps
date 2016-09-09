@@ -61,6 +61,7 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
     },
     doCalculations: function(noRollup) {
         this.ToDo = 0;
+        this.Estimate = 0;
         this.numDefined = 0;
         this.numInProgress = 0;
         this.numCompleted = 0;
@@ -265,6 +266,8 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
         name: "numCompleted"
     },{
         name: "ToDo"
+    },{
+        name: "totalEffort"
     },{
         name: 'pctCompleteCount'
     },{

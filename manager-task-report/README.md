@@ -1,14 +1,58 @@
 #Manager Task Report
 
-### Setup
-Relies on the existence of 4 custom User Fields:
-(1) Manager Employee ID
-(2) Employee ID
-(3) Cost Center
-(4) Management Level
 
-##Caveats
-User has an employee ID but does not have a Manager ID and also does not have any direct reports
+This report shows a summary of Tasks for the criteria selected.  Criteria may include: 
+* Release 
+    -  The release for the User Story that the Task is associated with.  
+* Manager 
+    -  This is the manager to show the task summary for.  The summary will show all employees that are either Owners of tasks for the selected release or milestone OR are managers of employees that Own tasks for the selected Release or Milestone.   
+* Milestones 
+    - If selected, only tasks will be shown for the User Stories associated with the selected Milestone(s)
+
+The Summary grid shows all employees (with tasks) that report up into the selected Manager.  It also includes the following Task Summary information: 
+*  # Tasks in Defined, In-Progress and Completed states
+*  Total Task Estimate (in Weeks)
+*  Total Task To Do (in Weeks)
+*  % Completed (count)
+*  % Complete (effort) - This is the % Complete in effort.  For all tasks in the Completed state, this is the sum of the Estimate.  For all tasks not in completed state, this is the sum of the (Estimate - To Do).  
+*  Delta To Do (if Show Historical Data is selected).  - This is the delta in the task todo from the N days back where N is the Days Back configuration in the App Settings.  
+
+![Screenshot](/images/manager-task-report.png)
+
+When a user is selected in the Summary grid, one of two views will be displayed below:
+
+#####Details Grid
+This grid will show all tasks that were used in the Summary calculations.  If a manager with multiple reports was selected, then this will show all tasks that meet the selected criteria for all users that report up through that selected person, including that selected person's tasks, if he\she have any.  
+Note that exports for the Details grid only include standard task fields and do not include the additional calculated or extended fields.  Exclusions include: %Completed, Work Product Dependencies, Work Product Milestones, Work Product Feature, Work Product Initiative, Historical State, Delta To Do.
+
+![Screenshot](/images/manager-task-report-details.png)
+
+#####Task Burndown
+This chart will show the Remaining vs. Estimate for all tasks that are used in the summary calculations.  
+
+![Screenshot](/images/manager-task-report-chart-details.png)
+
+### App Settings 
+This app relies on the existence of 3 custom User Fields:
+
+(1) Is Manager
+(2) Employee ID
+(3) Manager Employee ID
+
+These fields will need to be specified in the app settings before the app can run.  These fields are used to build the User Manager tree structure used in the summary grid and also in determining the manager-employee hierarchy so that task information can be rolled up.   
+
+Other app settings include:
+* Show Historical Data Checkbox - if selected, this app will get historical data for the tasks included in the summary.  This data is used to calculate the following:
+     - Delta To Do (in the Summary Grid)
+     - Delta To Do (in the details grid)
+     - Historical State (in the details grid)
+
+* Days Back 
+     - For the historical data, this is the number of days back to retrieve.  So, if 7 is entered, the delta to do is the difference in To Do from exactly 7 days ago and the Historical State is the state the task was in exactly 7 days ago.  
+
+![Screenshot](/images/manager-task-report-settings.png)
+
+
 
 ## Development Notes
 

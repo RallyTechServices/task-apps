@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Aug 14 2016 16:27:20 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Sep 08 2016 10:35:21 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Aug 14 2016 16:27:20 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Sep 08 2016 10:35:21 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 99292741911;
+        var CHECKSUM = 99978490979;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -923,6 +923,7 @@ Ext.define('CArABU.technicalservices.UserTreeItem',{
     },
     doCalculations: function(noRollup) {
         this.ToDo = 0;
+        this.Estimate = 0;
         this.numDefined = 0;
         this.numInProgress = 0;
         this.numCompleted = 0;
@@ -1127,6 +1128,8 @@ Ext.define("CArABU.technicalservices.UserSummaryTaskModel", {
         name: "numCompleted"
     },{
         name: "ToDo"
+    },{
+        name: "totalEffort"
     },{
         name: 'pctCompleteCount'
     },{
@@ -1942,6 +1945,13 @@ Ext.define("manager-task-report", {
                 text:'# Tasks Completed',
                 menuDisabled: true,
                 dataIndex:'numCompleted'
+            },{
+                text: 'Total Estimate (Wks)',
+                menuDisabled: true,
+                dataIndex: 'totalEffort',
+                renderer: function(v){
+                    return Number(v/40).toFixed(1);
+                }
             },{
                 text: 'Total ToDo (Wks)',
                 menuDisabled: true,
