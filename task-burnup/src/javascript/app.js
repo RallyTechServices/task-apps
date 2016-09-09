@@ -64,6 +64,15 @@ Ext.define("task-burnup", {
         this.logger.log('addComponents');
 
         this.getSelectorBox().add({
+            fieldLabel: 'Story Release',
+            xtype: 'rallyreleasecombobox',
+            itemId: 'cbRelease',
+            labelAlign: 'right',
+            labelWidth: 80,
+            margin: this.margin
+        });
+
+        this.getSelectorBox().add({
                 fieldLabel: 'Feature Milestone',
                 xtype: 'rallymilestonepicker',
                 itemId: 'featureMilestone',
@@ -80,7 +89,6 @@ Ext.define("task-burnup", {
                         if (!values || values.length === 0){
                             pk.setValueText("");
                         }
-
                     }
                 }
         });
@@ -200,6 +208,9 @@ Ext.define("task-burnup", {
     getStoryMilestones: function(){
         return this.down('#storyMilestone').getValue() || [];
     },
+    getReleaseFilter: function(){
+        return this.down('#cbRelease').getQueryFromSelected();
+    },
     getFeatureFilters: function() {
         return this.down('standalonefilter').getCustomFilter();
     },
@@ -242,28 +253,27 @@ Ext.define("task-burnup", {
         var featureMilestones = this.getFeatureMilestones(),
             storyMilestones = this.getStoryMilestones(),
             featureFilters = this.getFeatureFilters(),
-            featureName = this.getFeatureName();
+            featureName = this.getFeatureName(),
+            releaseFilter = this.getReleaseFilter();
 
         this.logger.log('getAncestors', featureMilestones, storyMilestones, featureFilters);
-        if (featureMilestones.length === 0 && storyMilestones.length === 0 && !featureFilters){
-            Rally.ui.notify.Notifier.showWarning({message:  "Please select a Feature Milestone, filter or Story Milestone filter."});
-            return;
-        }
 
 
-        var model = this.getPortfolioItemType(),
-            filters = [];
+        var model = 'HierarchicalRequirement',
+            filters = releaseFilter;
 
-        if (storyMilestones.length > 0){
-            var storyFilters = Ext.Array.map(storyMilestones, function(m){
+        if (storyMilestones.length > 0) {
+            var storyFilters = Ext.Array.map(storyMilestones, function (m) {
                 return {
                     property: 'Milestones',
                     value: m.get('_ref')
                 };
             });
             storyFilters = Rally.data.wsapi.Filter.or(storyFilters);
+            filters = filters.and(storyFilters);
+        }
 
-            if (featureMilestones.length > 0){
+        if (featureMilestones.length > 0){
                 var featureParentFilters = Ext.Array.map(featureMilestones, function(m){
                     return {
                         property: featureName + '.Milestones',
@@ -271,37 +281,37 @@ Ext.define("task-burnup", {
                     };
                 });
                 featureParentFilters = Rally.data.wsapi.Filter.or(featureParentFilters);
-                storyFilters = storyFilters.and(featureParentFilters);
-            }
-
-            if (featureFilters){
-                this.logger.log('featureFilters', featureFilters, featureFilters.toString());
-                storyFilters = storyFilters.and(this.getStoryFiltersFromFeatureFilters(featureFilters));
-            }
-
-
-
-            this.logger.log('getAncestors',storyFilters.toString());
-
-            model = 'HierarchicalRequirement';
-            filters = storyFilters;
-
-        } else if (featureMilestones.length > 0){
-            filters = Ext.Array.map(featureMilestones, function(m){
-                return {
-                    property: 'Milestones',
-                    value: m.get('_ref')
-                };
-            });
-            filters = Rally.data.wsapi.Filter.or(filters);
-
-            if (featureFilters){
-                filters = filters.and(featureFilters);
-            }
-
-        } else if (featureFilters){
-            filters = featureFilters;
+                filters = filters.and(featureParentFilters);
         }
+
+        if (featureFilters){
+            this.logger.log('featureFilters', featureFilters, featureFilters.toString());
+            filters = filters.and(this.getStoryFiltersFromFeatureFilters(featureFilters));
+        }
+
+
+
+        this.logger.log('getAncestors',filters.toString());
+
+        //    model = 'HierarchicalRequirement';
+        //    filters = storyFilters;
+        //
+        //} else if (featureMilestones.length > 0){
+        //    filters = Ext.Array.map(featureMilestones, function(m){
+        //        return {
+        //            property: 'Milestones',
+        //            value: m.get('_ref')
+        //        };
+        //    });
+        //    filters = Rally.data.wsapi.Filter.or(filters);
+        //
+        //    if (featureFilters){
+        //        filters = filters.and(featureFilters);
+        //    }
+        //
+        //} else if (featureFilters){
+        //    filters = featureFilters;
+        //}
 
         Ext.create('Rally.data.wsapi.Store',{
             model: model,
@@ -324,14 +334,25 @@ Ext.define("task-burnup", {
     showErrorNotification: function(msg){
         Rally.ui.notify.Notifier.showError({message: msg});
     },
+    showNoData: function(){
+        this.getDisplayBox().add({
+            xtype: 'container',
+            html: '<div class="no-data-container"><div class="secondary-message">No Data was found for the currently selected filters and project.</div></div>'
+        });
+    },
     updateView: function(ancestors){
 
         var oids = Ext.Array.map(ancestors, function(f){ return f.get('ObjectID');});
         this.logger.log('updateView', oids);
 
-        var taskOwners = this.getTaskOwners();
-
         this.getDisplayBox().removeAll();
+
+        if (oids.length === 0){
+            this.showNoData();
+            return;
+        }
+
+        var taskOwners = this.getTaskOwners();
 
         if (this.getShowBurnup()){
             this.getDisplayBox().add({
