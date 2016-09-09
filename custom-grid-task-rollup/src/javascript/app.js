@@ -78,6 +78,8 @@
             stateful: false,
 
             plugins: [{
+                ptype: 'rallygridboardaddnew'
+            },{
                     ptype: 'rallygridboardfieldpicker',
                     headerPosition: 'left',
                     modelNames: modelNames,
