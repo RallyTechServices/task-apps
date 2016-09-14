@@ -110,6 +110,21 @@
                 stateId: context.getScopedStateId('task-view'),
                 stateEvents: ['select','beforedestroy'],
                 margin: margin
+            },{
+                ptype: 'rallygridboardactionsmenu',
+                menuItems: [
+                    {
+                        text: 'Export...',
+                        handler: function() {
+                            window.location = Rally.ui.gridboard.Export.buildCsvExportUrl(
+                                this.down('rallygridboard').getGridOrBoard());
+                        },
+                        scope: this
+                    }
+                ],
+                buttonConfig: {
+                    iconCls: 'icon-export'
+                }
             }],
             gridConfig: {
                 rankColumnDataIndex: rankField,
