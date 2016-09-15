@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Aug 18 2016 15:43:42 GMT-0600 (MDT) -->
+    <!--  Build Date: Thu Sep 15 2016 09:44:55 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Aug 18 2016 15:43:42 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Thu Sep 15 2016 09:44:55 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 151035096839;
+        var CHECKSUM = 151740067729;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1972,7 +1972,7 @@ Ext.define("feature-status-by-task", {
         };
     },
     getStoryFetchList: function(){
-        return ['ObjectID','FormattedID','Name','Feature','Milestones','Owner',"DisplayName","c_QEOwner","WorkProduct"];
+        return ['ObjectID','FormattedID','Name','Feature','Milestones','Owner',"DisplayName","c_PMTQEOwner","WorkProduct"];
 
     },
     getStoryColumnCfgs: function(){
@@ -2002,7 +2002,7 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'templatecolumn',
             text: "Feature QE Owner",
-            tpl: '<tpl>{c_QEOwner}</tpl>',
+            tpl: '<tpl>{c_PMTQEOwner}</tpl>',
             defaultRenderer: function(value, meta, record) {
                 var feature = record.get('Feature')
                 return this.tpl.apply(feature);
@@ -2027,7 +2027,11 @@ Ext.define("feature-status-by-task", {
                 property: "Feature." + featureFilterField,
                 value: record.get(featureFilterField)
             });
-        filters = filters.and(this.getStoryFilters());
+
+        var storyFilters = this.getStoryFilters();
+        if (storyFilters && storyFilters.length > 0){
+            filters = filters.and(storyFilters);
+        }
 
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: modelNames,
@@ -2196,7 +2200,7 @@ Ext.define("feature-status-by-task", {
         return [];
     },
     getFeatureFetchList: function(){
-        var fetch =  ['ObjectID','FormattedID','Name','Owner'];
+        var fetch =  ['ObjectID','FormattedID','Name','Owner','c_PMTQEOwner'];
         if (this.getGroupByField()){
             fetch = fetch.concat(this.groupByFields);
         }
@@ -2394,6 +2398,9 @@ Ext.define("feature-status-by-task", {
             renderer: function(v,m,r){
                 return v && v._refObjectName;
             }
+        },{
+            dataIndex: 'c_PMTQEOwner',
+            text: 'QE Owner'
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,

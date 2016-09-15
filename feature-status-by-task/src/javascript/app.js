@@ -622,7 +622,7 @@ Ext.define("feature-status-by-task", {
         };
     },
     getStoryFetchList: function(){
-        return ['ObjectID','FormattedID','Name','Feature','Milestones','Owner',"DisplayName","c_QEOwner","WorkProduct"];
+        return ['ObjectID','FormattedID','Name','Feature','Milestones','Owner',"DisplayName","c_PMTQEOwner","WorkProduct"];
 
     },
     getStoryColumnCfgs: function(){
@@ -652,7 +652,7 @@ Ext.define("feature-status-by-task", {
         },{
             xtype: 'templatecolumn',
             text: "Feature QE Owner",
-            tpl: '<tpl>{c_QEOwner}</tpl>',
+            tpl: '<tpl>{c_PMTQEOwner}</tpl>',
             defaultRenderer: function(value, meta, record) {
                 var feature = record.get('Feature')
                 return this.tpl.apply(feature);
@@ -677,7 +677,11 @@ Ext.define("feature-status-by-task", {
                 property: "Feature." + featureFilterField,
                 value: record.get(featureFilterField)
             });
-        filters = filters.and(this.getStoryFilters());
+
+        var storyFilters = this.getStoryFilters();
+        if (storyFilters && storyFilters.length > 0){
+            filters = filters.and(storyFilters);
+        }
 
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: modelNames,
@@ -846,7 +850,7 @@ Ext.define("feature-status-by-task", {
         return [];
     },
     getFeatureFetchList: function(){
-        var fetch =  ['ObjectID','FormattedID','Name','Owner'];
+        var fetch =  ['ObjectID','FormattedID','Name','Owner','c_PMTQEOwner'];
         if (this.getGroupByField()){
             fetch = fetch.concat(this.groupByFields);
         }
@@ -1044,6 +1048,9 @@ Ext.define("feature-status-by-task", {
             renderer: function(v,m,r){
                 return v && v._refObjectName;
             }
+        },{
+            dataIndex: 'c_PMTQEOwner',
+            text: 'QE Owner'
         },{
             xtype: 'tasktodocolumn',
             menuDisabled: true,
