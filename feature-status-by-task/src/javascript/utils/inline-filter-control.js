@@ -77,7 +77,6 @@ Ext.define('CArABU.technicalservices.StandaloneFilter',{
         return null;
     },
     applyCustomFilter: function(filterObj){
-       // console.log('applyCustomFilter', filterObj);
         this.customFilter = filterObj && filterObj.filters;
     }
 });

@@ -42,7 +42,11 @@ Ext.define("manager-task-report", {
             isManagerField: this.getIsManagerField()
         });
         this.userManagerStore.on('ready', this._initializeApp, this);
+        this.userManagerStore.on('loaderror', this._showError, this);
         this.userManagerStore.on('configurationerror', this._showConfigurationError, this);
+    },
+    _showError: function(msg){
+        Rally.ui.notify.Notifier.showError({ message: msg });
     },
     _showConfigurationError: function(msg){
         this.down('#display_box').removeAll();
@@ -93,15 +97,11 @@ Ext.define("manager-task-report", {
     _getUserFetch: function(){
         return ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.getEmployeeIDField(), this.getManagerEmployeeIDField(), this.getIsManagerField()]);
     },
-    _updateManagers: function(store, records, success){
-        this.logger.log('_updateManagers', store, records);
-        this.managerRecords = null;
-        if (success){
-            this.managerRecords = records;
-        } else {
-            Rally.ui.notify.Notifier.showError({message: 'Error loading managers.'});
-        }
-    },
+    //_updateManagers: function(records, success){
+    //    this.logger.log('_updateManagers', records);
+    //    this.managerRecords = null;
+    //        this.managerRecords = records;
+    //},
     _addTimeboxFilter: function(){
         this.down('#manager_box').add({
             xtype: this.timeboxComboXtype, // 'rallyiterationcombobox',
@@ -130,12 +130,7 @@ Ext.define("manager-task-report", {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),
                 limit: 'Infinity',
-                autoLoad: true,
-                listeners: {
-                    scope: this,
-                    load: this._updateManagers,
-                    single: true
-                }
+                autoLoad: true
             },
             valueField: employeeIDField,
             displayField: "DisplayName"
@@ -146,11 +141,12 @@ Ext.define("manager-task-report", {
         this.down('#display_box').removeAll();
         this.down('#detail_box').removeAll();
     },
-    _initializeApp: function(){
+    _initializeApp: function(managerRecords){
         this.logger.log('_initializeApp');
         this._clearApp();
         this.down('#manager_box').removeAll();
 
+        this.managerRecords = managerRecords;
 
         this._addTimeboxFilter();
         this._addManagerFilters();
