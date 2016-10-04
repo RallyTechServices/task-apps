@@ -18,11 +18,49 @@ Ext.define('CArABU.technicalservices.UserManagerStore',{
         this._loadUserModel().then({
             success: function(model){
                 if (this._validateFields(model)){
-                    this.fireEvent('ready');
+
+                    this._loadManagers().then({
+                        success: function(managers){
+                            this.fireEvent('ready', managers);
+                        },
+                        failure: function(msg){
+                            this.fireEvent('loaderror', msg);
+                        },
+                        scope: this
+                    });
                 }
             },
-             scope: this
+            scope: this
         });
+    },
+    _loadManagers: function(){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.Store',{
+            model: 'User',
+            fetch: ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.employeeIDField, this.managerIDField, this.isManagerField]),
+            filters: this._getAllManagerFilters(),
+            limit: Infinity
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                }  else {
+                    deferred.reject("Error loading managers: " + operation.error.errors.join(','));
+                }
+            }
+        });
+        return deferred;
+    },
+    _getAllManagerFilters: function(){
+        return [{
+            property: this.employeeIDField,
+            operator: "!=",
+            value: ""
+        },{
+            property: this.isManagerField,
+            value: 'Y'
+        }];
     },
     _loadUserModel: function(){
         return Rally.data.ModelFactory.getModel({

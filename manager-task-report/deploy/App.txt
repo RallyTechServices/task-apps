@@ -3,12 +3,12 @@
 <head>
     <title>Manager Task Report</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Sep 08 2016 10:35:21 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Oct 03 2016 20:24:17 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Sep 08 2016 10:35:21 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Mon Oct 03 2016 20:24:17 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 99978490979;
+        var CHECKSUM = 103569971440;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -817,11 +817,49 @@ Ext.define('CArABU.technicalservices.UserManagerStore',{
         this._loadUserModel().then({
             success: function(model){
                 if (this._validateFields(model)){
-                    this.fireEvent('ready');
+
+                    this._loadManagers().then({
+                        success: function(managers){
+                            this.fireEvent('ready', managers);
+                        },
+                        failure: function(msg){
+                            this.fireEvent('loaderror', msg);
+                        },
+                        scope: this
+                    });
                 }
             },
-             scope: this
+            scope: this
         });
+    },
+    _loadManagers: function(){
+        var deferred = Ext.create('Deft.Deferred');
+
+        Ext.create('Rally.data.wsapi.Store',{
+            model: 'User',
+            fetch: ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.employeeIDField, this.managerIDField, this.isManagerField]),
+            filters: this._getAllManagerFilters(),
+            limit: Infinity
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records);
+                }  else {
+                    deferred.reject("Error loading managers: " + operation.error.errors.join(','));
+                }
+            }
+        });
+        return deferred;
+    },
+    _getAllManagerFilters: function(){
+        return [{
+            property: this.employeeIDField,
+            operator: "!=",
+            value: ""
+        },{
+            property: this.isManagerField,
+            value: 'Y'
+        }];
     },
     _loadUserModel: function(){
         return Rally.data.ModelFactory.getModel({
@@ -1219,7 +1257,11 @@ Ext.define("manager-task-report", {
             isManagerField: this.getIsManagerField()
         });
         this.userManagerStore.on('ready', this._initializeApp, this);
+        this.userManagerStore.on('loaderror', this._showError, this);
         this.userManagerStore.on('configurationerror', this._showConfigurationError, this);
+    },
+    _showError: function(msg){
+        Rally.ui.notify.Notifier.showError({ message: msg });
     },
     _showConfigurationError: function(msg){
         this.down('#display_box').removeAll();
@@ -1270,15 +1312,11 @@ Ext.define("manager-task-report", {
     _getUserFetch: function(){
         return ['ObjectID','UserName','Email','First Name','Last Name','DisplayName'].concat([this.getEmployeeIDField(), this.getManagerEmployeeIDField(), this.getIsManagerField()]);
     },
-    _updateManagers: function(store, records, success){
-        this.logger.log('_updateManagers', store, records);
-        this.managerRecords = null;
-        if (success){
-            this.managerRecords = records;
-        } else {
-            Rally.ui.notify.Notifier.showError({message: 'Error loading managers.'});
-        }
-    },
+    //_updateManagers: function(records, success){
+    //    this.logger.log('_updateManagers', records);
+    //    this.managerRecords = null;
+    //        this.managerRecords = records;
+    //},
     _addTimeboxFilter: function(){
         this.down('#manager_box').add({
             xtype: this.timeboxComboXtype, // 'rallyiterationcombobox',
@@ -1307,12 +1345,7 @@ Ext.define("manager-task-report", {
                 filters: this._getAllManagerFilters(),
                 fetch: this._getUserFetch(),
                 limit: 'Infinity',
-                autoLoad: true,
-                listeners: {
-                    scope: this,
-                    load: this._updateManagers,
-                    single: true
-                }
+                autoLoad: true
             },
             valueField: employeeIDField,
             displayField: "DisplayName"
@@ -1323,11 +1356,12 @@ Ext.define("manager-task-report", {
         this.down('#display_box').removeAll();
         this.down('#detail_box').removeAll();
     },
-    _initializeApp: function(){
+    _initializeApp: function(managerRecords){
         this.logger.log('_initializeApp');
         this._clearApp();
         this.down('#manager_box').removeAll();
 
+        this.managerRecords = managerRecords;
 
         this._addTimeboxFilter();
         this._addManagerFilters();
