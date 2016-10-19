@@ -60,7 +60,7 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     calculateRollups: function(taskOwners, storyOids) {
                         var TASK_STATES = ['Defined','In-Progress','Completed'];
                         var snaps = this.tasks || [];
-                        this.logger.log('calculateRollups', snaps, taskOwners, storyOids);
+                        this.logger.log('calculateRollups',  this.get('FormattedID'), snaps, taskOwners, storyOids);
 
 
                         storyOids = storyOids || [];

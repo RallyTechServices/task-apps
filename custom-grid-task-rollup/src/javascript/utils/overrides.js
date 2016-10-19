@@ -69,16 +69,14 @@ Ext.override(Rally.ui.gridboard.GridBoard, {
     setCurrentView: function(view) {
 
         this._setSharedViewProperties(this.plugins, view);
-        console.log ('setCurrentView', view);
+
         if (view.toggleState === 'grid') {
             Ext.state.Manager.set(this._getGridConfig().stateId, _.pick(view, ['columns', 'sorters']));
         } else if (view.toggleState === 'board') {
             Ext.state.Manager.set(this._getBoardConfig().fieldsStateId, view.fields);
         }
-        console.log ('setCurrentView2', view);
         Ext.state.Manager.set(this.stateId, _.pick(view, ['toggleState']));
-        console.log ('setCurrentView3', view);
         this.fireEvent('viewchange', this);
-        console.log ('setCurrentView4', view);
+
     }
 });

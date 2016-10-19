@@ -142,7 +142,7 @@ Ext.define("manager-task-report", {
         this.down('#detail_box').removeAll();
     },
     _initializeApp: function(managerRecords){
-        this.logger.log('_initializeApp');
+        this.logger.log('_initializeApp', managerRecords && managerRecords.length);
         this._clearApp();
         this.down('#manager_box').removeAll();
 
@@ -201,8 +201,6 @@ Ext.define("manager-task-report", {
             return Rally.data.wsapi.Filter.or(milestoneFilter);
         }
         return null;
-
-
     },
     getManagerRecords: function(){
        return this.managerRecords;

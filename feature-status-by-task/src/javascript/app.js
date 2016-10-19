@@ -283,8 +283,8 @@ Ext.define("feature-status-by-task", {
     },
     fetchFeatures: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-        this.logger.log('fetchFeatures', records);
         this.filterStoryObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        this.logger.log('fetchFeatures filterStoryObjectIDs', this.filterStoryObjectIDs);
         var featureIDs = this.getFeatureIDs(records);
 
         this.setLoading(true);
