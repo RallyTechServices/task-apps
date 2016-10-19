@@ -25,6 +25,10 @@
     margin: 0 auto;
 }
 
+.progress-bar-container {
+    white-space: nowrap;
+}
+
 .tslegend {
     width: 14px;
     height: 14px;

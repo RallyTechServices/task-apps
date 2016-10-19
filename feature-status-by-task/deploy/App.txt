@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Thu Sep 15 2016 09:44:55 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Oct 18 2016 20:53:40 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Sep 15 2016 09:44:55 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Oct 18 2016 20:53:40 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 151740067729;
+        var CHECKSUM = 152086046518;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -631,7 +631,6 @@ Ext.define('CArABU.technicalservices.StandaloneFilter',{
         return null;
     },
     applyCustomFilter: function(filterObj){
-       // console.log('applyCustomFilter', filterObj);
         this.customFilter = filterObj && filterObj.filters;
     }
 });
@@ -697,7 +696,7 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     calculateRollups: function(taskOwners, storyOids) {
                         var TASK_STATES = ['Defined','In-Progress','Completed'];
                         var snaps = this.tasks || [];
-                        this.logger.log('calculateRollups', snaps, taskOwners, storyOids);
+                        this.logger.log('calculateRollups',  this.get('FormattedID'), snaps, taskOwners, storyOids);
 
 
                         storyOids = storyOids || [];
@@ -1633,8 +1632,8 @@ Ext.define("feature-status-by-task", {
     },
     fetchFeatures: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-        this.logger.log('fetchFeatures', records);
         this.filterStoryObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
+        this.logger.log('fetchFeatures filterStoryObjectIDs', this.filterStoryObjectIDs);
         var featureIDs = this.getFeatureIDs(records);
 
         this.setLoading(true);
@@ -2598,6 +2597,10 @@ Ext.define("feature-status-by-task", {
     position: relative;
     background-color: #e6e6e6;
     margin: 0 auto;
+}
+
+.progress-bar-container {
+    white-space: nowrap;
 }
 
 .tslegend {
