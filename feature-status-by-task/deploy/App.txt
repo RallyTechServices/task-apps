@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Tue Oct 18 2016 20:53:40 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Oct 21 2016 18:16:54 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Oct 18 2016 20:53:40 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Fri Oct 21 2016 18:16:54 GMT-0600 (MDT)";
         var BUILDER = "kcorkan";
-        var CHECKSUM = 152086046518;
+        var CHECKSUM = 155537144657;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -998,10 +998,25 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             return colors[stateIdx];
         },
         getTooltip: function(values){
-            if (this.showDangerNotificationFn(values)){
-                return Ext.String.format('{0} missing Task Estimates', values && values.__missingEstimates);
+            var tooltip = '';
+            if (this.getText(values,0)){
+                tooltip += Ext.String.format("<span class='defined'>Defined</span>: {0}</br>", this.getText(values,0) || 0);
             }
-            return '';
+            if (this.getText(values,1)){
+                tooltip += Ext.String.format("<span class='inprogress'>In-Progress</span>: {0}</br>", this.getText(values,1) || 0);
+            }
+            if (this.getText(values,2)){
+                tooltip += Ext.String.format("<span class='completed'>Completed</span>: {0}</br>", this.getText(values,2) || 0);
+            }
+
+            if (this.showDangerNotificationFn(values)){
+                tooltip =  Ext.String.format("{0}<p class='warning'><span class='icon-warning'></span>{1} missing Task Estimates</p>", tooltip, values && values.__missingEstimates);
+            }
+
+            if (tooltip.length > 0){
+                tooltip = values.FormattedID + '<br/>' + tooltip;
+            }
+            return tooltip;
         },
         showDangerNotificationFn: function(recordData) {
             return this.field === '__taskEstimatePct' && recordData && recordData.__missingEstimates > 0;
@@ -2664,6 +2679,20 @@ Ext.define("feature-status-by-task", {
     position: absolute;
     top: 0;
     left: 0;
+}
+
+.warning {
+    color: #FAD200;
+}
+
+.defined{
+    color: #FBB990;
+}
+.inprogress{
+    color:#7CAFD7;
+}
+.completed{
+    color:#8DC63F;
 }
     </style>
 
