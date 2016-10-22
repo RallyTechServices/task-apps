@@ -23,10 +23,25 @@ Ext.define('CArABU.technicalservices.PctCompleteTemplate',{
             return colors[stateIdx];
         },
         getTooltip: function(values){
-            if (this.showDangerNotificationFn(values)){
-                return Ext.String.format('{0} missing Task Estimates', values && values.__missingEstimates);
+            var tooltip = '';
+            if (this.getText(values,0)){
+                tooltip += Ext.String.format("<span class='defined'>Defined</span>: {0}</br>", this.getText(values,0) || 0);
             }
-            return '';
+            if (this.getText(values,1)){
+                tooltip += Ext.String.format("<span class='inprogress'>In-Progress</span>: {0}</br>", this.getText(values,1) || 0);
+            }
+            if (this.getText(values,2)){
+                tooltip += Ext.String.format("<span class='completed'>Completed</span>: {0}</br>", this.getText(values,2) || 0);
+            }
+
+            if (this.showDangerNotificationFn(values)){
+                tooltip =  Ext.String.format("{0}<p class='warning'><span class='icon-warning'></span>{1} missing Task Estimates</p>", tooltip, values && values.__missingEstimates);
+            }
+
+            if (tooltip.length > 0){
+                tooltip = values.FormattedID + '<br/>' + tooltip;
+            }
+            return tooltip;
         },
         showDangerNotificationFn: function(recordData) {
             return this.field === '__taskEstimatePct' && recordData && recordData.__missingEstimates > 0;

@@ -91,3 +91,17 @@
     top: 0;
     left: 0;
 }
+
+.warning {
+    color: #FAD200;
+}
+
+.defined{
+    color: #FBB990;
+}
+.inprogress{
+    color:#7CAFD7;
+}
+.completed{
+    color:#8DC63F;
+}
