@@ -3,10 +3,10 @@
 <head>
     <title>Task Burnup</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Sep 09 2016 07:42:07 GMT-0600 (MDT) -->
+    <!--  Build Date: Tue Jan 24 2017 06:38:12 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Sep 09 2016 07:42:07 GMT-0600 (MDT)";
+        var APP_BUILD_DATE = "Tue Jan 24 2017 06:38:12 GMT-0700 (MST)";
         var CHECKSUM = [%= checksum %];
     </script>
     

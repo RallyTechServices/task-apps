@@ -402,7 +402,8 @@ Ext.define("task-burnup", {
                     _ValidFrom: 1
                 },
                 context: this.getContext().getDataContext(),
-                limit: Infinity
+                limit: Infinity,
+                removeUnauthorizedSnapshots: true 
             });
         }
         return configs;
