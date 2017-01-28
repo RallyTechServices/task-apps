@@ -272,7 +272,8 @@ Ext.define("feature-status-by-task", {
             model: 'HierarchicalRequirement',
             fetch: ['Feature','ObjectID','Children'],
             filters: this.getStoryFilters(),
-            limit: 'Infinity'
+            limit: 'Infinity',
+            pageSize: 2000
         }).then({
             success: this.fetchFeatures,
             failure: this.showErrorNotification,

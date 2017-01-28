@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Fri Oct 21 2016 18:16:54 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Jan 27 2017 19:05:33 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Fri Oct 21 2016 18:16:54 GMT-0600 (MDT)";
-        var BUILDER = "kcorkan";
-        var CHECKSUM = 155537144657;
+        var APP_BUILD_DATE = "Fri Jan 27 2017 19:05:33 GMT-0800 (PST)";
+        var BUILDER = "jmartin";
+        var CHECKSUM = 155714643134;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -1357,6 +1357,7 @@ Ext.define('CArABU.technicalservices.Utility',{
         var filters = _.map(chunk, function(c){ return {property: 'ObjectID', value: c}; });
         filters = Rally.data.wsapi.Filter.or(filters);
         config.filters = filters;
+        config.pageSize = 2000;
         return CArABU.technicalservices.Utility.fetchWsapiRecords(config);
     }
 
@@ -1636,7 +1637,8 @@ Ext.define("feature-status-by-task", {
             model: 'HierarchicalRequirement',
             fetch: ['Feature','ObjectID','Children'],
             filters: this.getStoryFilters(),
-            limit: 'Infinity'
+            limit: 'Infinity',
+            pageSize: 2000
         }).then({
             success: this.fetchFeatures,
             failure: this.showErrorNotification,
