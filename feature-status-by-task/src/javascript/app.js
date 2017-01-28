@@ -516,7 +516,7 @@ Ext.define("feature-status-by-task", {
                 store: Ext.create('Rally.data.custom.Store',{
                     model: this.getExtendedModelName(),
                     data: records,
-                    pageSize: records.length
+                    //pageSize: records.length
                 }),
                 selModel: Ext.create("Ext.selection.RowModel",{
                     listeners: {
@@ -536,7 +536,7 @@ Ext.define("feature-status-by-task", {
                 height: this.getHeight(),
                 width: '100%',
                 flex: 1,
-                showPagingToolbar: false
+                //showPagingToolbar: false
             });
        }
 
