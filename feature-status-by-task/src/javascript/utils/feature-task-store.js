@@ -1,22 +1,22 @@
 Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     logger: new Rally.technicalservices.Logger(),
-    MAX_CHUNK_SIZE: 25,
+    MAX_CHUNK_SIZE: 425,
+    MAX_THREADS: 10,
     TASK_STATES: ['Defined','In-Progress','Completed'],
 
+    mixins: {
+        observable: 'Ext.util.Observable'
+    },
+    
     loadTasks: function(records, taskOwners, storyOids){
         var deferred = Ext.create('Deft.Deferred');
 
         var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
-        this.logger.log('CArABU.technicalservices.loadTasks.load objectIDs', featureObjectIDs);
+
         this.fetchTaskChunks(featureObjectIDs).then({
             success: function(taskRecords){
-                this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
-                var snapsByOid = this._getSnapsByOid(taskRecords, featureObjectIDs);
-
-                for (var i=0; i < records.length; i++){
-                    records[i].addTasks(snapsByOid[records[i].get('ObjectID') || [] ]);
-                }
-                deferred.resolve(records);
+                this.fireEvent('tasksloaded',this);
+                deferred.resolve(taskRecords);
             },
             failure: function(msg){
                 this.logger.log('load.fetchTaskChunks FAILURE', msg);
@@ -26,6 +26,23 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         });
         return deferred;
     },
+    
+    collectTasks: function(featureRecords, taskRecords) {
+        var featureObjectIDs = _.map(featureRecords, function(r){ return r.get('ObjectID'); });
+
+        this.logger.log('success inside collectTasks: taskRecords.length', taskRecords.length);
+        
+        var snapsByOid = this._getSnapsByOid(taskRecords, featureObjectIDs);
+        this.logger.log('success inside collectTasks -- after snapsByOid');
+        
+        taskRecords = null;
+        
+        for (var i=0; i < featureRecords.length; i++){
+            featureRecords[i].addTasks(snapsByOid[featureRecords[i].get('ObjectID') || [] ]);
+        }
+        
+        return featureRecords;
+    },
 
     load: function(records, storyFilters, taskOwners){
         var deferred = Ext.create('Deft.Deferred');
@@ -34,10 +51,9 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         if (storyFilters){
             this.fetchStories(featureObjectIDs, storyFilters).then({
                 success: function(storyIDs){
-                    this.logger.log('load Stories Success', storyIDs);
+
                     this.fetchTaskChunks(storyIDs, taskOwners).then({
                         success: function(taskRecords){
-                            this.logger.log('load.fetchStories.fetchTaskChunks SUCCESS', taskRecords);
                             var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
                             deferred.resolve(totals);
                         },
@@ -55,11 +71,12 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
                 scope: this
             });
         } else {
-            this.logger.log('CArABU.technicalservices.FeatureTaskStore.load objectIDs', objectIDs);
+
             this.fetchTaskChunks(featureObjectIDs, taskOwners).then({
                 success: function(taskRecords){
-                    this.logger.log('load.fetchTaskChunks SUCCESS', taskRecords);
+                    Rally.getApp().setLoading("Calculating Rollups...");
                     var totals = this.calculateTaskRollups(taskRecords, records, featureObjectIDs);
+                    Rally.getApp().setLoading(false);
                     deferred.resolve(totals);
                 },
                 failure: function(msg){
@@ -72,16 +89,32 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         return deferred;
     },
     fetchTaskChunks: function(ancestorObjectIDs, taskOwners, storyOids){
-        var deferred = Ext.create('Deft.Deferred');
+        var deferred = Ext.create('Deft.Deferred'),
+            me = this;
         var promises = [];
-        for (var i=0; i < ancestorObjectIDs.length; i = i+this.MAX_CHUNK_SIZE){
-            var chunk = Ext.Array.slice(ancestorObjectIDs, i, i + this.MAX_CHUNK_SIZE);
-            promises.push(this._fetchLBAPIChunk(chunk, taskOwners, storyOids));
-        }
-        Deft.Promise.all(promises).then({
+        var chunk_size = ancestorObjectIDs.length / this.MAX_THREADS;
+        
+        Ext.Array.each(_.range(0,this.MAX_THREADS), function(page_index){
+            var start = page_index * chunk_size;
+            var chunk = Ext.Array.slice(ancestorObjectIDs, start, start + chunk_size);
+            promises.push(function() { 
+                return me._fetchLBAPIChunk(chunk, taskOwners, storyOids); 
+            });
+        });
+        
+        //        var chunk_size = this.MAX_CHUNK_SIZE;
+//        for (var i=0; i < ancestorObjectIDs.length; i = i+chunk_size){
+//            var chunk = Ext.clone( Ext.Array.slice(ancestorObjectIDs, i, i + chunk_size) );
+//            promises.push(function() { 
+//                return me._fetchLBAPIChunk(chunk, taskOwners, storyOids); 
+//            });
+//        }
+
+        //Deft.Promise.all(promises).then({
+        Deft.Chain.parallel(promises,this).then({
             success: function(results){
                 var records = _.flatten(results);
-                this.logger.log('fetchTaskChunks SUCCESS results', results,records);
+
                 deferred.resolve(records);
             },
             failure: function(msg){
@@ -126,8 +159,8 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         return deferred;
     },
     calculateTaskRollups: function(taskRecords, featureRecords, objectIDs){
-        this.logger.log('_calculateTaskRollups', taskRecords, featureRecords);
-
+        this.logger.log('calculateTaskRollups', taskRecords.length, featureRecords.length);
+        
         var snapsByOid = this._getSnapsByOid(taskRecords, objectIDs),
             totalToDo = [0,0,0],
             totalEstimate = [0,0,0],
@@ -176,12 +209,12 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
                     totalCount[i]+= rollup.taskCount[i];
                 }
             }
-            this.logger.log('_calculateRollup', r.get('FormattedID'), rollup);
+
             rollupsByOid[r.get('ObjectID')] = rollup;
         }, this);
-        this.logger.log('_calculateRollup totals (ToDo, Estimate, Count)', totalToDo, totalEstimate, totalCount);
-        var totals = {taskToDo: totalToDo, taskEstimate: totalEstimate, taskCount: totalCount};
 
+        var totals = {taskToDo: totalToDo, taskEstimate: totalEstimate, taskCount: totalCount};
+        
         Ext.Array.each(featureRecords, function(r){
             var rollup = rollupsByOid[r.get('ObjectID')] || null;
             if (rollup){
@@ -227,15 +260,14 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
                 rollup.todo[state] += (snap.ToDo || 0)
             }
         }
-        this.logger.log('_calculateRollup', rollup);
+
         return rollup;
 
     },
     _getSnapsByOid: function(snapshots, featureObjectIDs){
+        var hash = {};
 
-         var hash = {};
         for (var i=0; i< snapshots.length; i++){
-
             var snap = snapshots[i].getData();
             var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
                 objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
@@ -249,7 +281,6 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     },
     _fetchLBAPIChunk: function(objectIDs, taskOwners, storyOids){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_fetchLBAPIChunk', objectIDs, taskOwners, storyOids);
 
         var filters = [
             {
@@ -266,36 +297,20 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
 
         ];
 
-        //if (taskOwners && taskOwners.length > 0){
-        //    filters.push({
-        //        property: 'Owner',
-        //        operator: 'in',
-        //        value: taskOwners
-        //    });
-        //}
-        //
-        //if (storyOids && storyOids.length > 0){
-        //    filters.push({
-        //        property: 'WorkProduct',
-        //        operator: 'in',
-        //        value: storyOids
-        //    });
-        //}
-
         Ext.create('Rally.data.lookback.SnapshotStore',{
             fetch: this._getLBAPIFetchList(),
             filters: filters,
+            limit: Infinity,
             hydrate: ['State'],
             sorters: [{
                 property: 'ObjectID',
                 direction: 'ASC'
             }],
-            compress: true,
-            removeUnauthorizedSnapshots: true
+            removeUnauthorizedSnapshots: true,
+            useHttpPost: true
         }).load({
             callback: function(records, operation, success){
                 if (success){
-                    this.logger.log('_fetchLBAPIChunk SUCCESS', records);
                     deferred.resolve(records);
                 } else {
                     var msg = "Failure loading snapshots for objectIDs: " + objectIDs.join(', ') + ":  " + operation.error.errors.join(',');

@@ -84,7 +84,6 @@ Ext.define('CArABU.technicalservices.Utility',{
             filterOids = false ;
 
         if (config.filters){
-
             promises.push(CArABU.technicalservices.Utility.fetchWsapiRecords(config));
             filterOids = true
         } else {

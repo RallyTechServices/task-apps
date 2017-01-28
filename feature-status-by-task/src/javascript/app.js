@@ -4,7 +4,6 @@ Ext.define("feature-status-by-task", {
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
     items: [
-        {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
         {xtype:'container',itemId:'filter_box_1', layout: 'hbox'},
         {xtype:'container',itemId:'filter_box_2', layout: 'hbox'},
         {xtype:'container',itemId:'filter_box_3', layout: 'hbox'},
@@ -99,7 +98,6 @@ Ext.define("feature-status-by-task", {
 
     },
     addMilestonesBox: function(){
-        this.logger.log('addStoryFilters');
 
         var ct = this.down('#filter_box_1');
         ct.removeAll();
@@ -195,8 +193,6 @@ Ext.define("feature-status-by-task", {
     },
     addUserBox: function(){
 
-        this.logger.log('addUserBox');
-
         var ct = this.down('#filter_box_2');
         ct.removeAll();
 
@@ -261,13 +257,13 @@ Ext.define("feature-status-by-task", {
     },
 
     updateView: function(){
-        this.logger.log('updateView');
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
         this.getGridBox().removeAll();
         this.getSummaryBox().removeAll();
         this.getDetailBox().removeAll();
         this.setLoading(true);
         //First, we need to get the feature IDs of interest
+        this.logger.log('updateView');
         this.fetchWsapiRecords({
             model: 'HierarchicalRequirement',
             fetch: ['Feature','ObjectID','Children'],
@@ -285,10 +281,14 @@ Ext.define("feature-status-by-task", {
     fetchFeatures: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
         this.filterStoryObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
-        this.logger.log('fetchFeatures filterStoryObjectIDs', this.filterStoryObjectIDs);
+
         var featureIDs = this.getFeatureIDs(records);
 
         this.setLoading(true);
+        this.logger.log('fetchFeatures', records.length);
+        
+        records = null;
+        
         CArABU.technicalservices.ModelBuilder.build(this.getModelName(), this.getExtendedModelName()).then({
             success: function(model){
                 this.setLoading("Loading Features...");
@@ -296,7 +296,8 @@ Ext.define("feature-status-by-task", {
                 CArABU.technicalservices.Utility.fetchChunkedWsapiRecords({
                     model: model,
                     fetch: this.getFeatureFetchList(),
-                    filters: this.getFeatureFilters()
+                    filters: this.getFeatureFilters(),
+                    pageSize: 2000
                 }, featureIDs).then({
                     success: this.fetchTasks,
                     failure: this.showErrorNotification,
@@ -307,10 +308,10 @@ Ext.define("feature-status-by-task", {
             scope: this
         });
     },
-    fetchTasks: function(records){
+    fetchTasks: function(featureRecords){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-        this.logger.log('fetchTasks', records.length);
-        if (!records || records.length === 0){
+
+        if (!featureRecords || featureRecords.length === 0){
             this.setLoading(false);
             this.down('#summary_box').add({
                 xtype: 'container',
@@ -320,15 +321,44 @@ Ext.define("feature-status-by-task", {
         }
 
         this.setLoading("Loading Tasks...");
-        Ext.create('CArABU.technicalservices.FeatureTaskStore').loadTasks(records,this.getTaskOwners(),this.filterStoryObjectIDs).then({
-            success: this.refineRecords,
+        this.logger.log('fetchTasks', featureRecords.length);
+        
+        var store = Ext.create('CArABU.technicalservices.FeatureTaskStore',{
+            listeners: {
+                tasksloaded: this._changeUI,
+                scope: this
+            }
+        });
+        
+        store.loadTasks(featureRecords,this.getTaskOwners(),this.filterStoryObjectIDs).then({
+            success: function(taskRecords) {
+                this.logger.log('collect records', taskRecords.length);
+                this.setLoading('Collecting...');
+                
+                var records = store.collectTasks(featureRecords,taskRecords);
+                this.refineRecords(records);
+                return;
+            },
             failure: this.showErrorNotification,
             scope: this
-        }).always(function(){ this.setLoading(false);},this);
+        });
+        
+        return;
     },
+    
+    _changeUI: function() {
+        //update the UI so that the browser things something is still going on
+        if ( this.down('#secret_box') ) { this.down('#secret_box').destroy(); }
+        this.logger.log("touch UI");
+        this.down('#summary_box').add({xtype:'container',itemId:'secret_box',html:'lol'});
+    },
+    
     refineRecords: function(records){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-        //this function takes the feature records with the tasks on them and refines them accoring to the filters.
+        //this function takes the feature records with the tasks on them and refines them according to the filters.
+        this.setLoading(false);
+        this.logger.log('refineRecords', records.length);
+        
         var maxToDo = 0,
             maxEstimate = 0,
             maxCount = 0,
@@ -337,7 +367,9 @@ Ext.define("feature-status-by-task", {
             totalEstimate = [0,0,0],
             taskOwners = this.getTaskOwners(),
             refinedRecords = [];
-        this.logger.log('refineRecords taskOwners', taskOwners);
+
+        this.setLoading('Calculating...');
+
         Ext.Array.each(records, function(r){
             var resultsHash = r.calculateRollups(taskOwners, this.filterStoryObjectIDs);
             maxToDo = Math.max(maxToDo, Ext.Array.sum(resultsHash.todo));
@@ -354,8 +386,6 @@ Ext.define("feature-status-by-task", {
             }
         }, this);
 
-        this.logger.log('refineRecords', totalToDo, totalEstimate, totalCount);
-
         if (!refinedRecords || refinedRecords.length === 0){
             this.setLoading(false);
             this.down('#summary_box').add({
@@ -368,8 +398,8 @@ Ext.define("feature-status-by-task", {
         this.buildTreeGrid(refinedRecords, maxToDo, maxEstimate, maxCount);
     },
     buildSummaryBar: function(totalFeatures, totalToDo, totalEstimate, totalCount) {
-        this.logger.log('buildSummaryBar', totalFeatures, totalToDo, totalEstimate, totalCount);
-
+        this.logger.log('buildSummaryBar');
+        
         var colorData = [{
             color: '#FBB990',
             label: 'Defined'
@@ -384,7 +414,7 @@ Ext.define("feature-status-by-task", {
         var maxToDo = Math.max(totalEstimate[0] + totalEstimate[1], Ext.Array.sum(totalToDo)),
             maxEstimate = Ext.Array.sum(totalEstimate),
             maxCount = Ext.Array.sum(totalCount);
-        this.logger.log('buildSummaryBar', maxToDo, maxEstimate, maxCount);
+
         this.getSummaryBox().add({
             xtype: 'rallygrid',
             itemId: 'summary-grid',
@@ -460,7 +490,8 @@ Ext.define("feature-status-by-task", {
     },
     buildTreeGrid: function(records, maxToDo, maxEstimate, maxCount){
         //updateView => fetchStories => fetchFeatures => fetchTasks => refineRecords => buildTreeGrid
-        this.logger.log('buildGrid', records);
+        this.logger.log('buildTreeGrid', records.length);
+        this.setLoading(false);
 
         if (records.length === 0){
 
@@ -469,7 +500,6 @@ Ext.define("feature-status-by-task", {
 
         var groupBy = this.getGroupByField();
 
-        this.logger.log('buildGrid records', records, groupBy);
         this.getGridBox().removeAll();
         this.down('#detail_box').removeAll();
 
@@ -536,14 +566,13 @@ Ext.define("feature-status-by-task", {
                 height: this.getHeight(),
                 width: '100%',
                 flex: 1,
-                //showPagingToolbar: false
+                showPagingToolbar: true
             });
        }
 
 
     },
     buildTreeStore: function(groupBy, featureRecords){
-        this.logger.log('buildTreeStore', groupBy, featureRecords);
 
 
         var treeModel = Ext.define("GroupedFeatureModel", {
@@ -578,7 +607,6 @@ Ext.define("feature-status-by-task", {
 
         });
 
-        this.logger.log('buildTreeStore', hash, displayGroup);
         var data = [];
         var maxToDo = 0,
             maxEstimate = 0,
@@ -661,7 +689,6 @@ Ext.define("feature-status-by-task", {
         }];
     },
     _showStories: function(store, record, index){
-        this.logger.log('_showStories',record, index);
 
         this.down('#detail_box').removeAll();
 
@@ -756,7 +783,6 @@ Ext.define("feature-status-by-task", {
                             forceFit: true,
                             plugins: ['rallytreeviewdragdrop', 'rallyviewvisibilitylistener'],
                             getRowClass: function(record) {
-                                console.log('getRowClass',record, taskOwners);
                                 if (record.get('_type') === 'task') {
 
                                     var ownerID = record.get('Owner') && record.get('Owner').ObjectID || 0;
@@ -803,7 +829,6 @@ Ext.define("feature-status-by-task", {
                 ids.push(id);
             }
         });
-        this.logger.log('getFeatureIDs.Feature ObjectIDs', ids);
         return ids;
     },
     getFeatureFilters: function(){
@@ -813,7 +838,6 @@ Ext.define("feature-status-by-task", {
 
         if (featureFilters){
             filters.push(featureFilters);
-            this.logger.log('fetFeatureFilters', featureFilters.toString());
         }
 
         var milestones = this.down('#featureMilestones') && this.down('#featureMilestones').getValue();
@@ -826,26 +850,23 @@ Ext.define("feature-status-by-task", {
             });
             milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
             filters.push(milestoneFilter);
-            this.logger.log('getFeatureFilters milestoneFilter', milestoneFilter.toString());
         }
 
         var featureOwner = this.down('#usrFeatureOwner') && this.down('#usrFeatureOwner').getValue(),
             featureOwnerFilter = null;
-        this.logger.log('getFeatureFilters',featureOwner);
+
 
         if (featureOwner){
             featureOwnerFilter = Ext.create('Rally.data.wsapi.Filter',{
                 property: 'Owner.ObjectID',
                 value: featureOwner
             });
-            this.logger.log('getFeatureFilters featureOwnerFilter', featureOwnerFilter.toString());
 
             filters.push(featureOwnerFilter);
         }
 
         if (filters.length > 0){
             filters = Rally.data.wsapi.Filter.and(filters);
-            this.logger.log('getFeatureFilters',filters.toString());
             return filters;
         }
         return [];
@@ -866,7 +887,7 @@ Ext.define("feature-status-by-task", {
 
         Ext.create('Rally.data.wsapi.Store',config).load({
             callback: function(records, operation, success){
-                this.logger.log('fetchFeatures.load',success, operation, records);
+
                 if (operation.wasSuccessful()){
                     deferred.resolve(records);
                 } else {
@@ -899,7 +920,7 @@ Ext.define("feature-status-by-task", {
             }
 
         }
-        this.logger.log('getStoryDetailFilters', filters.toString());
+
         return filters;
 
         //Now we need to filter on task owner and manager owner
@@ -910,8 +931,6 @@ Ext.define("feature-status-by-task", {
             milestoneFilter = null,
             milestones = this.down('#storyMilestones') && this.down('#storyMilestones').getValue();
 
-        this.logger.log('getStoryFilters',timeboxCombo.getValue(), milestones);
-
         if (milestones && milestones.length > 0){
             milestoneFilter = Ext.Array.map(milestones, function(m){
                 return {
@@ -920,7 +939,6 @@ Ext.define("feature-status-by-task", {
                 };
             });
             milestoneFilter =  Rally.data.wsapi.Filter.or(milestoneFilter);
-            this.logger.log('getStoryFilters milestoneFilter', milestoneFilter.toString());
         }
 
         if (Ext.isArray(timeboxFilter) && timeboxFilter.length > 0){
@@ -955,13 +973,11 @@ Ext.define("feature-status-by-task", {
         var taskOwner = this.down('#usrTaskOwner') && this.down('#usrTaskOwner').getRecord();
         var manager = this.down('#usrManager') && this.down('#usrManager').getRecord();
 
-        this.logger.log('getTaskFilters', taskOwner,manager);
         var users = [];
         if (taskOwner && taskOwner.get('ObjectID')){
             users.push(taskOwner.get('ObjectID'));
         }
         if (manager){
-            this.logger.log('getTaskFilters including manager reports', manager);
             var reports = CArABU.technicalservices.Utility.getReports(manager);
             users = users.concat(reports);
         }
@@ -1119,7 +1135,6 @@ Ext.define("feature-status-by-task", {
 
     },
     saveColumnWidths: function(ct, column, width){
-        this.logger.log('saveColumnWidths',ct,column,width);
         if (column){
             if (!this.columns){
                 this.columns = {};
