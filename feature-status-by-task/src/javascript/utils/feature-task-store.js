@@ -9,22 +9,8 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     },
     
     loadTasks: function(records, taskOwners, storyOids){
-        var deferred = Ext.create('Deft.Deferred');
-
         var featureObjectIDs = _.map(records, function(r){ return r.get('ObjectID'); });
-
-        this.fetchTaskChunks(featureObjectIDs).then({
-            success: function(taskRecords){
-                this.fireEvent('tasksloaded',this);
-                deferred.resolve(taskRecords);
-            },
-            failure: function(msg){
-                this.logger.log('load.fetchTaskChunks FAILURE', msg);
-                deferred.reject(msg);
-            },
-            scope: this
-        });
-        return deferred;
+        return this.fetchTaskChunks(featureObjectIDs);
     },
     
     collectTasks: function(featureRecords, taskRecords) {
@@ -114,7 +100,7 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
         Deft.Chain.parallel(promises,this).then({
             success: function(results){
                 var records = _.flatten(results);
-
+                results = null;
                 deferred.resolve(records);
             },
             failure: function(msg){

@@ -323,34 +323,13 @@ Ext.define("feature-status-by-task", {
         this.setLoading("Loading Tasks...");
         this.logger.log('fetchTasks', featureRecords.length);
         
-        var store = Ext.create('CArABU.technicalservices.FeatureTaskStore',{
-            listeners: {
-                tasksloaded: this._changeUI,
-                scope: this
-            }
-        });
+        var store = Ext.create('CArABU.technicalservices.FeatureTaskStore',{   });
         
-        store.loadTasks(featureRecords,this.getTaskOwners(),this.filterStoryObjectIDs).then({
-            success: function(taskRecords) {
-                this.logger.log('collect records', taskRecords.length);
-                this.setLoading('Collecting...');
-                
-                var records = store.collectTasks(featureRecords,taskRecords);
-                this.refineRecords(records);
-                return;
-            },
-            failure: this.showErrorNotification,
-            scope: this
-        });
-        
-        return;
-    },
-    
-    _changeUI: function() {
-        //update the UI so that the browser things something is still going on
-        if ( this.down('#secret_box') ) { this.down('#secret_box').destroy(); }
-        this.logger.log("touch UI");
-        this.down('#summary_box').add({xtype:'container',itemId:'secret_box',html:'lol'});
+        Deft.Chain.pipeline([
+            function() {  return store.loadTasks(featureRecords,this.getTaskOwners(),this.filterStoryObjectIDs); },
+            function(taskRecords) { return store.collectTasks(featureRecords,taskRecords); },
+            function(records) { return this.refineRecords(records); }
+        ], this);
     },
     
     refineRecords: function(records){
