@@ -84,7 +84,6 @@ Ext.define('CArABU.technicalservices.Utility',{
             filterOids = false ;
 
         if (config.filters){
-
             promises.push(CArABU.technicalservices.Utility.fetchWsapiRecords(config));
             filterOids = true
         } else {
@@ -115,6 +114,7 @@ Ext.define('CArABU.technicalservices.Utility',{
         var filters = _.map(chunk, function(c){ return {property: 'ObjectID', value: c}; });
         filters = Rally.data.wsapi.Filter.or(filters);
         config.filters = filters;
+        config.pageSize = 2000;
         return CArABU.technicalservices.Utility.fetchWsapiRecords(config);
     }
 

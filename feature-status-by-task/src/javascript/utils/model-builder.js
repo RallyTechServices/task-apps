@@ -50,7 +50,6 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     snaps: undefined,
 
                     addTasks: function(snaps){
-                        this.logger.log('addTasks', snaps);
                         this.tasks = snaps || [];
                     },
                     hasTasks: function(){
@@ -60,8 +59,6 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                     calculateRollups: function(taskOwners, storyOids) {
                         var TASK_STATES = ['Defined','In-Progress','Completed'];
                         var snaps = this.tasks || [];
-                        this.logger.log('calculateRollups',  this.get('FormattedID'), snaps, taskOwners, storyOids);
-
 
                         storyOids = storyOids || [];
 
@@ -90,7 +87,6 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                                 if (includeTask){
                                     taskCount[stateIdx]++;
                                     if (!snap.Estimate){
-                                        console.log('snap',snap, snap.Estimate);
                                         missingEstimates++;
                                     }
                                     var est = snap.Estimate || 0;
@@ -105,7 +101,6 @@ Ext.define('CArABU.technicalservices.ModelBuilder',{
                                 }
                             }
                         }
-                        this.logger.log('calculateRollups', this.get('FormattedID'), missingEstimates, taskCount, taskEstimate, taskToDo);
 
                         this.set('__taskToDo', taskToDo);
                         this.set('__taskEstimate', taskEstimate);
