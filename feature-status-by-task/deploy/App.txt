@@ -3,12 +3,12 @@
 <head>
     <title>Feature Status by Task</title>
     <!--  (c) 2016 CA Technologies.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jan 29 2017 13:25:40 GMT-0800 (PST) -->
+    <!--  Build Date: Sun Jan 29 2017 13:57:17 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jan 29 2017 13:25:40 GMT-0800 (PST)";
+        var APP_BUILD_DATE = "Sun Jan 29 2017 13:57:17 GMT-0800 (PST)";
         var BUILDER = "jmartin";
-        var CHECKSUM = 146028596946;
+        var CHECKSUM = 146811950331;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -457,16 +457,20 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     },
     _getSnapsByOid: function(snapshots, featureObjectIDs){
         var hash = {};
-
-        for (var i=0; i< snapshots.length; i++){
+        Ext.Array.each(featureObjectIDs, function(oid) {
+            hash[oid] = [];
+        });
+        var number_of_snaps = snapshots.length;
+        
+        for (var i=0; i< number_of_snaps; i++){
             var snap = snapshots[i].getData();
-            var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
-                objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
-
-            if (!hash[objectID]){
-                hash[objectID] = [];
-            }
-            hash[objectID].push(snap);
+            var itemHierarchy = snap._ItemHierarchy;
+            
+//            var objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
+//            hash[objectID].push(snap);
+            Ext.Array.each(itemHierarchy, function(objectID){
+                if ( hash[objectID] ) { hash[objectID].push(snap); };
+            });
         }
         return hash;
     },

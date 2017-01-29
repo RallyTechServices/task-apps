@@ -252,16 +252,20 @@ Ext.define('CArABU.technicalservices.FeatureTaskStore',{
     },
     _getSnapsByOid: function(snapshots, featureObjectIDs){
         var hash = {};
-
-        for (var i=0; i< snapshots.length; i++){
+        Ext.Array.each(featureObjectIDs, function(oid) {
+            hash[oid] = [];
+        });
+        var number_of_snaps = snapshots.length;
+        
+        for (var i=0; i< number_of_snaps; i++){
             var snap = snapshots[i].getData();
-            var itemHierarchy = snapshots[i].get('_ItemHierarchy'),
-                objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
-
-            if (!hash[objectID]){
-                hash[objectID] = [];
-            }
-            hash[objectID].push(snap);
+            var itemHierarchy = snap._ItemHierarchy;
+            
+//            var objectID = Ext.Array.intersect(featureObjectIDs, itemHierarchy)[0];
+//            hash[objectID].push(snap);
+            Ext.Array.each(itemHierarchy, function(objectID){
+                if ( hash[objectID] ) { hash[objectID].push(snap); };
+            });
         }
         return hash;
     },
