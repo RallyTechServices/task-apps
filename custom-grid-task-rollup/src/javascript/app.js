@@ -55,21 +55,28 @@
             useLookback: this.getUseLookback(),
             maxChunkSize: this.getMaxChunkSize()
         });
-
+        
+        this.setLoading('Loading...');
+        
         store.model.addField({name: '__tasks', type: 'auto', defaultValue: null});
         store.on('load', this.updateTaskCache, this);
 
-        var context = this.getContext(),
-            modelNames = [this.getViewType()],
-            margin = '3 10 3 10',
-            rankField = 'DragAndDropRank',
-            enableRank = true;
+        this._addGridBoard(store);
 
-        if (this.getViewType().toLowerCase() === 'task'){
-            rankField = 'TaskIndex';
-            enableRank = false;
-        }
+    },
+    
+    _addGridBoard: function(store) {
+    	var context = this.getContext(),
+	        modelNames = [this.getViewType()],
+	        margin = '3 10 3 10',
+	        rankField = 'DragAndDropRank',
+	        enableRank = true;
 
+	    if (this.getViewType().toLowerCase() === 'task'){
+	        rankField = 'TaskIndex';
+	        enableRank = false;
+	    }
+    
         this.add({
             xtype: 'rallygridboard',
             context: context,
@@ -166,23 +173,38 @@
     showErrorMessage: function(error){
         this.logger.log('showErrorMessage', error);
     },
+    
     updateModels: function(records){
+    	this.setLoading('Rolling Up Information');
         this.logger.log('updateModels', this.taskCache);
         Ext.Array.each(records, function(r){
             r.set('__tasks', this.taskCache && this.taskCache.getTaskList(r.get('ObjectID')));
-            console.log('r', r.get('__tasks'))
+            //console.log('r', r.get('__tasks'))
         }, this );
+                
+        this.setLoading('Refreshing view');
+        this.logger.log('Refreshing view');
+        
         this.down('rallygridboard').getGridOrBoard().getStore().fireEvent('refresh', this.down('rallygridboard').getGridOrBoard().getStore());
-
+        this.setLoading(false);
     },
+    
     updateTaskCache: function(store, nodes, records, success){
-        this.logger.log('updateTaskCache', store, nodes, records, success);
+    	var me = this;
+        this.logger.log('updateTaskCache', success);
 
+        this.setLoading('Updating Task Cache');
         this.taskCache.fetchTasks(records).then({
             success: this.updateModels,
             failure: this.showErrorNotification,
             scope: this
-        });
+        }).always(function(){ me.setLoading(false); });
+    },
+    
+    showErrorNotification: function(msg) {
+    	var message = msg || "There was a problem loading data";
+    	
+    	Rally.ui.notify.Notifier.showError({message: message});
     },
 
     getViewType: function(){
