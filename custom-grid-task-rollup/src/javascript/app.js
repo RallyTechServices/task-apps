@@ -177,12 +177,15 @@
     updateModels: function(records){
     	this.setLoading('Rolling Up Information');
         this.logger.log('updateModels', this.taskCache);
-        Ext.Array.each(records, function(r){
-            r.set('__tasks', this.taskCache && this.taskCache.getTaskList(r.get('ObjectID')));
+        
+        // suspend layout so that we can set all the records more quickly and refresh the view all at once
+        this.down('rallygridboard').getGridOrBoard().suspendLayouts();
+        for ( var i=0; i<records.length; i++ ) {
+            records[i].set('__tasks', this.taskCache && this.taskCache.getTaskList(records[i].get('ObjectID')));
             //console.log('r', r.get('__tasks'))
-        }, this );
+        }
+        this.down('rallygridboard').getGridOrBoard().resumeLayouts();
                 
-        this.setLoading('Refreshing view');
         this.logger.log('Refreshing view');
         
         this.down('rallygridboard').getGridOrBoard().getStore().fireEvent('refresh', this.down('rallygridboard').getGridOrBoard().getStore());

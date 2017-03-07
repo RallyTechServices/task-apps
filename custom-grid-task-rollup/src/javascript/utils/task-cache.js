@@ -68,30 +68,26 @@ Ext.define('CArABU.technicalservices.TaskCache',{
         }
         return deferred.promise;
     },
-    _fetchTasksLookbackByChunk: function(ancestorOids){
+    _fetchTasksLookback: function(ancestorOids){
         var me = this,
         	deferred = Ext.create('Deft.Deferred');
 
         var promises = [];
-//        for (var i=0; i < ancestorOids.length; i = i+this.maxChunkSize){
-//            var chunks = Ext.Array.slice(ancestorOids, i, i + this.maxChunkSize);
-//            promises.push(function() { 
-//                this.logger.log(chunks.length);
-//            	return this._fetchLBAPIChunk(chunks); 
-//        	});
-//        }
-        var chunk_count = Math.ceil(ancestorOids.length / this.maxChunkSize, 10);
-        this.logger.log('chunk size :', this.maxChunkSize);
+
+        var chunk_size = ancestorOids.length / 2;
+        
+        var chunk_count = Math.ceil(ancestorOids.length / chunk_size, 10);
+        this.logger.log('chunk size :', chunk_size);
         this.logger.log('oid count  :', ancestorOids.length);
         this.logger.log('chunk count:', chunk_count);
-        Ext.Array.each(_.range(0,ancestorOids.length,this.maxChunkSize), function(i){
-        	var chunks = Ext.Array.slice(ancestorOids,i,i+me.maxChunkSize);
+        Ext.Array.each(_.range(0,ancestorOids.length,chunk_size), function(i){
+        	var chunks = Ext.Array.slice(ancestorOids,i,i+chunk_size);
         	promises.push(function() {
         		return me._fetchLBAPIChunk(chunks);
         	});
         });
  
-        this.logger.log("_fetchLBAPIChunks, count:", promises);
+        this.logger.log("_fetchLBAPIChunks, count:", promises.length);
 
 //        Deft.Promise.all(promises).then({
         Deft.Chain.parallel(promises,this).then({
@@ -110,7 +106,7 @@ Ext.define('CArABU.technicalservices.TaskCache',{
         });
         return deferred.promise;
     },
-    _fetchTasksLookback: function(ancestorOids){
+    _fetchTasksLookbackWithOneChunk: function(ancestorOids){
         var me = this,
         	deferred = Ext.create('Deft.Deferred');
  
